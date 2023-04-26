@@ -1,7 +1,14 @@
-use mongodb::{Client, Collection};
+use mongodb::{Client, Collection  , Database,options::{ClientOptions, GridFsBucketOptions},};
+use mongodb_gridfs::{options::GridFSBucketOptions, GridFSBucket ,  GridFSError};
+use futures::stream::StreamExt;
 use mongodb::bson::{self,oid::ObjectId, doc, Bson};
 use serde::{Serialize, Deserialize};
+use mongodb::options::UpdateOptions;
 use std::io;
+use std::fs::File;
+use std::io::Read;
+use std::str::FromStr;
+use std::io::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Users {
@@ -50,12 +57,12 @@ pub struct VoiceNote{
 
 
 
-pub async fn connect_to_mongodb() -> Collection<Users> {
-    let client = Client::with_uri_str("mongodb+srv://rustuser:rustuserIBA@cluster0.3kwjnje.mongodb.net/test").await.unwrap();
+pub async fn connect_to_mongodb() -> (Collection<Users>, Database, Client) {
+    let client = Client::with_uri_str("mongodb+srv://RustUser:RUSTIBA@cluster0.btmwmdh.mongodb.net/test").await.unwrap();
     let db = client.database("Cluster0");
     let collection = db.collection::<Users>("users");
     println!("reached");
-    collection
+    (collection , db , client)
 }
 
 async fn create_user(user_collection: Collection<Users>, username: String, password: String, name: String) -> ObjectId {
@@ -132,6 +139,36 @@ pub async fn login(user_collection: Collection<Users>) -> Option<Users> {
     password = password.trim().to_string();
 
     get_user_by_username(user_collection, username, password).await
+}
+
+pub async fn save_voice_note(collection: Collection<Users>, DB: Database , userid: ObjectId, filepath: String) -> ObjectId{
+    
+    let mut bucket = GridFSBucket::new(DB.clone(), Some(GridFSBucketOptions::default()));
+    let id = bucket
+    .upload_from_stream("hello.wav", "hello.wav".as_bytes(), None)
+    .await;
+
+    
+    // Create a filter to match the user with the given ID
+    let filter = doc! { "_id": userid };
+
+    // Create an update document to append the voice note ID to the `voice_notes` array
+    let update = doc! { "$push": { "voice_notes": id.clone().expect("ID should be a string").to_hex()} };
+
+    // Create an UpdateOptions instance with default options
+    let options = UpdateOptions::builder().build();
+
+    // Call the update_one method on the collection with the filter, update, and options
+    let result = collection.update_one(filter, update, options).await;
+
+    println!("Audio file saved in MongoDB using GridFS!");
+    id.expect("ID should be a string")
+}
+
+pub async fn play_audio(DB: Database , id: ObjectId) {
+    let bucket = GridFSBucket::new(DB.clone(), Some(GridFSBucketOptions::default()));
+    let mut cursor = bucket.open_download_stream(id).await;
+    let buffer = cursor.expect("REASON").next().await.unwrap();
 }
 
 fn main() {}

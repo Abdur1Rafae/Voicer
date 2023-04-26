@@ -1,4 +1,5 @@
 mod db_config;
+use std::fs;
 
 use db_config::connect_to_mongodb;
 use record_audio::audio_clip::AudioClip as ac;
@@ -7,12 +8,11 @@ use std::io;
 use mongodb::{Collection, bson::oid::ObjectId};
 
 #[tokio::main]
+
 async fn main() {
-    let user_collection:Collection<db_config::Users> = connect_to_mongodb().await;
+    let (user_collection, DB, client) = connect_to_mongodb().await;
+
     let mut input = String::new();
-
-    
-
 
     let mut user_id=ObjectId::new();
     let mut authenticated = false;
@@ -65,4 +65,11 @@ async fn main() {
         Err(err) => println!("Error {}", err),
     }
 
+  let v_id =  db_config::save_voice_note(user_collection,DB.clone() , user_id, file_name.to_string()).await;
+  let path = "D:\\speaker\\hello.wav";
+    match fs::remove_file(path) {
+        Ok(()) => println!("File deleted successfully!"),
+        Err(e) => println!("Error deleting file: {}", e),
+    }  
+  db_config::play_audio(DB , v_id).await;
 }
