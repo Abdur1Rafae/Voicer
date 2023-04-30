@@ -1,14 +1,20 @@
 use mongodb::{Client, Collection  , Database,options::{ClientOptions, GridFsBucketOptions},};
-use mongodb_gridfs::{options::GridFSBucketOptions, GridFSBucket ,  GridFSError};
+use mongodb_gridfs::{options::GridFSBucketOptions, GridFSBucket,  GridFSError};
 use futures::stream::StreamExt;
+use futures_util::io::AsyncReadExt;
 use mongodb::bson::{self,oid::ObjectId, doc, Bson};
 use serde::{Serialize, Deserialize};
 use mongodb::options::UpdateOptions;
 use std::io;
 use std::fs::File;
+use std::env;
 use std::io::Read;
 use std::str::FromStr;
 use std::io::prelude::*;
+use rodio::Sink;
+use pyo3::prelude::*;
+use pyo3::types::PyTuple;
+
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Users {
@@ -48,14 +54,6 @@ pub struct VoiceNote{
     replies:Vec<ObjectId>,
     reactions:Vec<Reaction>,
 }
-
-
-
-
-
-
-
-
 
 pub async fn connect_to_mongodb() -> (Collection<Users>, Database, Client) {
     let client = Client::with_uri_str("mongodb+srv://RustUser:RUSTIBA@cluster0.btmwmdh.mongodb.net/test").await.unwrap();
@@ -141,35 +139,96 @@ pub async fn login(user_collection: Collection<Users>) -> Option<Users> {
     get_user_by_username(user_collection, username, password).await
 }
 
-pub async fn save_voice_note(collection: Collection<Users>, DB: Database , userid: ObjectId, filepath: String) -> ObjectId{
+pub async fn save_voice_note(userid: ObjectId) -> PyResult<()>{
+
+    Python::with_gil(|py| {
+        let fun: Py<PyAny> = PyModule::from_code(
+            py,
+            "import pymongo\nimport gridfs\n\
+             def save_sound(user_id):
+                client = pymongo.MongoClient(f'mongodb+srv://RustUser:RUSTIBA@cluster0.btmwmdh.mongodb.net/test')
+
+                # Access a database
+                db = client['Cluster0']
+                fs = gridfs.GridFS(db, collection='fs')
+                with open('hello.wav', 'rb') as f:
+                    contents = f.read()
+            
+                # Create a new GridFS file and write the contents to it
+                grid_in = fs.new_file(filename='new.wav')
+                grid_in.write(contents)
+                grid_in.close()
+            
+                # Get the _id of the newly uploaded file
+                file_id = grid_in._id
+                users_collection = db['users']
+                users_collection.update_one(
+                {'_id': user_id},
+                {'$push': {'voice_notes': {'id': file_id}}}
+            )
+            
+                print('Voicenote ID added to user document successfully.')
+        ",        
+
+
+            "",
+            "",
+        )
+        .expect("function should be called")
+        .getattr("save_sound")?
+        .into();
     
-    let mut bucket = GridFSBucket::new(DB.clone(), Some(GridFSBucketOptions::default()));
-    let id = bucket
-    .upload_from_stream("hello.wav", "hello.wav".as_bytes(), None)
-    .await;
+        // call object without any arguments
+        let args = PyTuple::new(py, &[userid.to_string()]);
 
-    
-    // Create a filter to match the user with the given ID
-    let filter = doc! { "_id": userid };
-
-    // Create an update document to append the voice note ID to the `voice_notes` array
-    let update = doc! { "$push": { "voice_notes": id.clone().expect("ID should be a string").to_hex()} };
-
-    // Create an UpdateOptions instance with default options
-    let options = UpdateOptions::builder().build();
-
-    // Call the update_one method on the collection with the filter, update, and options
-    let result = collection.update_one(filter, update, options).await;
-
-    println!("Audio file saved in MongoDB using GridFS!");
-    id.expect("ID should be a string")
+        fun.call1(py , args);
+        Ok(())
+    })
+ 
 }
 
-pub async fn play_audio(DB: Database , id: ObjectId) {
-    let bucket = GridFSBucket::new(DB.clone(), Some(GridFSBucketOptions::default()));
-    let mut cursor = bucket.open_download_stream(id).await;
-    let buffer = cursor.expect("REASON").next().await.unwrap();
+
+pub async fn play_audio(v_id : &str) -> PyResult<()> {
+    Python::with_gil(|py| {
+        let fun: Py<PyAny> = PyModule::from_code(
+            py,
+            "import pymongo\nimport gridfs\nimport playsound\n\
+            def download_audio_file( file_id):
+            
+                client = pymongo.MongoClient(f'mongodb+srv://RustUser:RUSTIBA@cluster0.btmwmdh.mongodb.net/test')
+            
+                # Access a database
+                db = client['Cluster0']
+                fs = gridfs.GridFS(db, collection='fs')
+                # Find the audio file in GridFS
+                grid_out = fs.find_one({'_id': file_id})
+            
+                # Read the audio file data into a variable
+                audio_data = grid_out.read()
+            
+                # Write the audio file data to a local file with a .wav extension
+                with open('downloaded.wav', 'wb') as f:
+                    f.write(audio_data)
+                playsound('downloaded.wav')
+        
+        ",        
+
+
+            "",
+            "",
+        )
+        .expect("function should be called")
+        .getattr("download_audio_file")?
+        .into();
+    
+        // call object without any arguments
+        let args = PyTuple::new(py, &[v_id.to_string()]);
+
+        fun.call1(py , args);
+
+        Ok(())
+    })
+     
 }
 
 fn main() {}
-

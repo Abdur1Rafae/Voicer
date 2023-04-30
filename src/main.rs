@@ -65,11 +65,12 @@ async fn main() {
         Err(err) => println!("Error {}", err),
     }
 
-  let v_id =  db_config::save_voice_note(user_collection,DB.clone() , user_id, file_name.to_string()).await;
-  let path = "D:\\speaker\\hello.wav";
+  let v_id =  db_config::save_voice_note(user_id).await;
+  
+  let path = "hello.wav";
     match fs::remove_file(path) {
         Ok(()) => println!("File deleted successfully!"),
         Err(e) => println!("Error deleting file: {}", e),
     }  
-  db_config::play_audio(DB , v_id).await;
+  db_config::play_audio("644e4397f424bc54fca3b912").await;
 }
