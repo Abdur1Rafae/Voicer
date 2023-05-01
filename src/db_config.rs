@@ -1,10 +1,7 @@
 use mongodb::{Client, Collection  , Database,options::{ClientOptions, GridFsBucketOptions},};
-use mongodb_gridfs::{options::GridFSBucketOptions, GridFSBucket,  GridFSError};
 use mongodb::options::FindOneOptions;
 use mongodb::options::FindOneAndUpdateOptions;
-use futures::stream::StreamExt;
 use futures_util::io::AsyncReadExt;
-use mongodb::{Client, Collection  , Database};
 use mongodb::bson::{self,oid::ObjectId, doc, Bson};
 use regex::Regex;
 use mongodb::{options::FindOptions};
@@ -106,7 +103,7 @@ pub async fn find_users_by_name(usercollection: Collection<Users>, keyword_name:
 async fn create_user(user_collection: Collection<Users>, username: String, password: String, name: String) -> ObjectId {
     let mut user_id = ObjectId::new();
     let new_user = Users {
-        _id: ObjectId::new(),
+        _id: user_id,
         username: username.clone(),
         password: password,
         name: name,
@@ -125,8 +122,8 @@ async fn create_user(user_collection: Collection<Users>, username: String, passw
             ObjectId::parse_str("f0f0f0f0f0f0f0f0f0f0f0f0").unwrap()},
         None => {
             println!("Creating new user");
-            new_user.insert_one(user_collection.clone()).await
-   
+            new_user.insert_one(user_collection.clone()).await;
+            user_id
         }
     };
         
@@ -302,9 +299,9 @@ async fn save_voice_note(collection: Collection<Users> ,userid: ObjectId, v_id: 
  
 // }
 
-        Ok(())
+//         Ok(())
      
-}
+// }
 
 // pub async fn play_audio(v_id : &str) -> PyResult<()> {
 //     Python::with_gil(|py| {
@@ -347,9 +344,9 @@ async fn save_voice_note(collection: Collection<Users> ,userid: ObjectId, v_id: 
 //         Ok(())
 //     })
 
-pub async fn play_audio(v_id : &str) -> PyResult<()> {
-        Ok(())
+// pub async fn play_audio(v_id : &str) -> PyResult<()> {
+//         Ok(())
      
-// }
+// // }
 
 fn main() {}

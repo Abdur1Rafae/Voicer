@@ -62,7 +62,7 @@ async fn main() {
 
     match io::stdin().read_line(&mut input) {
         Ok(_) => {
-            if input.trim() == "y" {
+            if input.trim() == "t" {
                 let mut file_name= ObjectId::new();
                 file_name= db_config::create_post(voice_note_collection.clone(), user_collection.clone(), user_id).await;
                 let directory = format!("{}/{}.wav", folder_name, file_name.to_hex());
@@ -81,29 +81,6 @@ async fn main() {
             }
             else if input.trim()== "f" {
                 println!("Enter the name");
-    // let updated = db_config::update_description_by_username(user_collection.clone(), "user2", "I am user2 ").await;
-    // if updated {
-    //     println!("User name updated");
-    // } else {
-    //     println!("User name not updated");
-    // }
-    let file_name = "hello.wav";
-    match ac::record(None) {
-        Ok(clip) => {
-            println!("Successfully recorded!");
-            match clip.export(format!("{}" , file_name).as_str()) {
-                Ok(_) => {
-                    println!("Successfully saved as hello.wav");
-                    
-                    //to play immediately, after ctrl-c
-                    //clip.play().unwrap();
-                }
-                Err(err) => println!("Error {}", err),
-            }
-        }
-        Err(err) => println!("Error {}", err),
-    }
-
                 input = String::new();
 
                 match io::stdin().read_line(&mut input) {
