@@ -1,12 +1,13 @@
-use mongodb::{Client, Collection  , Database,options::{ClientOptions, GridFsBucketOptions},};
+use mongodb::{Client, Collection  , Database};
 use mongodb::options::FindOneOptions;
 use mongodb::options::FindOneAndUpdateOptions;
 use futures_util::io::AsyncReadExt;
 use mongodb::bson::{self,oid::ObjectId, doc, Bson};
 use regex::Regex;
 use mongodb::{options::FindOptions};
-use serde::{Serialize, Deserialize};
 use mongodb::options::UpdateOptions;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::io;
 
 
@@ -49,13 +50,15 @@ pub struct Reaction{
     reaction: ReactionType
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct VoiceNote{
-    v_id:bson::oid::ObjectId,
-    user_id:ObjectId,
-    is_post:bool,
-    replies:Vec<ObjectId>,
-    reactions:Vec<Reaction>,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VoiceNote {
+    pub v_id: ObjectId,
+    pub user_id: ObjectId,
+    pub is_post: bool,
+    pub replies: Vec<ObjectId>,
+    pub reactions: Vec<Reaction>,
+    #[serde(with = "chrono::serde::ts_seconds")]
+    timestamp: DateTime<Utc>,
 }
 
 impl VoiceNote{
@@ -138,6 +141,7 @@ pub async fn create_post(voice_collection: Collection<VoiceNote>, user_collectio
         is_post: true,
         replies: Vec::new(),
         reactions: Vec::new(),
+        timestamp: Utc::now()
     };
     new_voice_note.insert_one(voice_collection.clone()).await;
     save_voice_note(user_collection, user_id, voice_id).await;
