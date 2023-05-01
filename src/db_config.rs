@@ -131,8 +131,6 @@ async fn create_user(user_collection: Collection<Users>, username: String, passw
     };
         
     user
-    new_user.insert_one(user_collection.clone()).await;
-    user_id
 }
 
 pub async fn create_post(voice_collection: Collection<VoiceNote>, user_collection: Collection<Users>, user_id: ObjectId) -> ObjectId {
