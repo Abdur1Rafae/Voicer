@@ -10,8 +10,13 @@ use mongodb::{Collection, bson::oid::ObjectId};
 #[tokio::main]
 
 async fn main() {
-    let (user_collection, voice_note_collection, db, client) = connect_to_mongodb().await;
-
+    
+    
+    //checking find users by names functions
+    // let (user_collection, voice_note_collection, db, client) = connect_to_mongodb().await;
+    // let mut userlist = db_config::find_users_by_names(user_collection.clone(), "Abdur Rafae").await;
+    // println!("{:?}", userlist);
+    
     let mut input = String::new();
 
     let mut user_id=ObjectId::new();
@@ -85,8 +90,8 @@ async fn main() {
 
                 match io::stdin().read_line(&mut input) {
                     Ok(_) => {
-                        let result = db_config::find_user_by_name(user_collection.clone(), input).await;
-                        println!("{:?}", result);
+                        //let result = db_config::find_users_by_names(user_collection.clone(), input).await;
+                        //println!("{:?}", result);
                     }
                     Err(err) => {
                         println!("Error {}", err);

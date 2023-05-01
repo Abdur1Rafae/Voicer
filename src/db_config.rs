@@ -9,7 +9,7 @@ use mongodb::options::UpdateOptions;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::io;
-
+use futures_util::StreamExt;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Users {
@@ -60,6 +60,16 @@ pub struct VoiceNote {
     #[serde(with = "chrono::serde::ts_seconds")]
     timestamp: DateTime<Utc>,
 }
+#[derive(Serialize, Deserialize, Debug)]
+pub struct publicUser{
+    pub _id: ObjectId,
+    pub username:String,
+    pub name: String,
+    pub description: String,
+    pub followers:Vec<ObjectId>,
+    pub following:Vec<ObjectId>,
+    pub voice_notes:Vec<ObjectId>
+}
 
 impl VoiceNote{
     pub async fn insert_one(&self, collection: Collection<VoiceNote>) {
@@ -77,27 +87,27 @@ pub async fn connect_to_mongodb() -> (Collection<Users>, Collection<VoiceNote>, 
     (collection, vcollection, db , client)
 }
 
-pub async fn find_user_by_name(collection: Collection<Users>, keyword_name: String) ->Option<String> {
-    let filter = doc! {"name": {"$regex": &format!("^{}$", keyword_name), "$options": "i"}};
-
-    let mut user;
-
-    match collection.find_one(filter, None).await {
-        Ok(result) => match result {
-            Some(doc) => {
-                user = Some(doc.name);
-            }
-            None => {
-                user = None;
-            },
-        },
-        Err(e) => {
-            println!("Failed to get user: {}", e);
-            user = None;
+pub async fn find_users_by_names(user_collection: Collection<Users> , name: &str) -> Vec<publicUser> {
+    let filter = doc! {"name": name};
+    let mut cursor = user_collection.find(filter, None).await.expect("Failed to execute find.");
+    let mut users = Vec::new();
+    while let Some(result) = cursor.next().await {
+        if let Ok(user) = result {
+            let pub_user = publicUser {
+                _id: user._id,
+                username: user.username,
+                name: user.name,
+                description: user.description,
+                followers: user.followers,
+                following: user.following,
+                voice_notes: user.voice_notes,
+            };
+            users.push(pub_user);
         }
-    };
-    user
+        
+    }
 
+    users
 }
 
 
@@ -252,102 +262,5 @@ async fn save_voice_note(collection: Collection<Users> ,userid: ObjectId, v_id: 
     println!("Audio file saved in MongoDB using GridFS!");
 }
 
-// pub async fn save_voice_note(userid: ObjectId) -> PyResult<()>{
-
-//     Python::with_gil(|py| {
-//         let fun: Py<PyAny> = PyModule::from_code(
-//             py,
-//             "import pymongo\nimport gridfs\n\
-//              def save_sound(user_id):
-//                 client = pymongo.MongoClient(f'mongodb+srv://RustUser:RUSTIBA@cluster0.btmwmdh.mongodb.net/test')
-
-//                 # Access a database
-//                 db = client['Cluster0']
-//                 fs = gridfs.GridFS(db, collection='fs')
-//                 with open('hello.wav', 'rb') as f:
-//                     contents = f.read()
-            
-//                 # Create a new GridFS file and write the contents to it
-//                 grid_in = fs.new_file(filename='new.wav')
-//                 grid_in.write(contents)
-//                 grid_in.close()
-            
-//                 # Get the _id of the newly uploaded file
-//                 file_id = grid_in._id
-//                 users_collection = db['users']
-//                 users_collection.update_one(
-//                 {'_id': user_id},
-//                 {'$push': {'voice_notes': {'id': file_id}}}
-//             )
-            
-//                 print('Voicenote ID added to user document successfully.')
-//         ",        
-
-
-//             "",
-//             "",
-//         )
-//         .expect("function should be called")
-//         .getattr("save_sound")?
-//         .into();
-    
-//         // call object without any arguments
-//         let args = PyTuple::new(py, &[userid.to_string()]);
-
-//         fun.call1(py , args);
-//         Ok(())
-//     })
- 
-// }
-
-//         Ok(())
-     
-// }
-
-// pub async fn play_audio(v_id : &str) -> PyResult<()> {
-//     Python::with_gil(|py| {
-//         let fun: Py<PyAny> = PyModule::from_code(
-//             py,
-//             "import pymongo\nimport gridfs\nimport playsound\n\
-//             def download_audio_file( file_id):
-            
-//                 client = pymongo.MongoClient(f'mongodb+srv://RustUser:RUSTIBA@cluster0.btmwmdh.mongodb.net/test')
-            
-//                 # Access a database
-//                 db = client['Cluster0']
-//                 fs = gridfs.GridFS(db, collection='fs')
-//                 # Find the audio file in GridFS
-//                 grid_out = fs.find_one({'_id': file_id})
-            
-//                 # Read the audio file data into a variable
-//                 audio_data = grid_out.read()
-            
-//                 # Write the audio file data to a local file with a .wav extension
-//                 with open('downloaded.wav', 'wb') as f:
-//                     f.write(audio_data)
-//                 playsound('downloaded.wav')
-        
-//         ",        
-
-
-//             "",
-//             "",
-//         )
-//         .expect("function should be called")
-//         .getattr("download_audio_file")?
-//         .into();
-    
-//         // call object without any arguments
-//         let args = PyTuple::new(py, &[v_id.to_string()]);
-
-//         fun.call1(py , args);
-
-//         Ok(())
-//     })
-
-// pub async fn play_audio(v_id : &str) -> PyResult<()> {
-//         Ok(())
-     
-// // }
 
 fn main() {}
