@@ -19,11 +19,18 @@ async fn main() {
 
     while(!authenticated){
         println!("Do you want to login or signup? (l/s): ");
+        input.clear();
         match io::stdin().read_line(&mut input) {
             Ok(_) => {
                 if input.trim() == "s" {
+                    println!("signup page");
                     user_id = db_config::sign_up(user_collection.clone()).await;
+                    if user_id == ObjectId::parse_str("f0f0f0f0f0f0f0f0f0f0f0f0").unwrap() {
+                        authenticated = false;
+                    }
+                    else{
                     authenticated= true;
+                }
                 } else if input.trim() == "l" {
                     let res_user = db_config::login(user_collection.clone()).await;
                     match(res_user){
@@ -47,7 +54,12 @@ async fn main() {
     // Call the create_user function to create a new user
     println!("User created with ID: {:?}", user_id);
 
-
+    // let updated = db_config::update_description_by_username(user_collection.clone(), "user2", "I am user2 ").await;
+    // if updated {
+    //     println!("User name updated");
+    // } else {
+    //     println!("User name not updated");
+    // }
     let file_name = "hello.wav";
     match ac::record(None) {
         Ok(clip) => {
