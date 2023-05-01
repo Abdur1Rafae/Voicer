@@ -1,19 +1,10 @@
-use mongodb::{Client, Collection  , Database,options::{ClientOptions, GridFsBucketOptions},};
-use mongodb_gridfs::{options::GridFSBucketOptions, GridFSBucket,  GridFSError};
-use futures::stream::StreamExt;
-use futures_util::io::AsyncReadExt;
+use mongodb::{Client, Collection  , Database};
 use mongodb::bson::{self,oid::ObjectId, doc, Bson};
+use regex::Regex;
+use mongodb::{options::FindOptions};
 use serde::{Serialize, Deserialize};
 use mongodb::options::UpdateOptions;
 use std::io;
-use std::fs::File;
-use std::env;
-use std::io::Read;
-use std::str::FromStr;
-use std::io::prelude::*;
-use rodio::Sink;
-use pyo3::prelude::*;
-use pyo3::types::PyTuple;
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -33,6 +24,14 @@ impl Users {
         let new_user = self.clone();
         collection.insert_one(new_user, None).await.unwrap();
     }
+
+    // pub fn new(name: &str, age: u8, email: &str) -> Self {
+    //     Self {
+    //         name: name.to_string(),
+    //         age,
+    //         email: email.to_string(),
+    //     }
+    // }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -71,6 +70,32 @@ pub async fn connect_to_mongodb() -> (Collection<Users>, Collection<VoiceNote>, 
     println!("Connected to MongoDB");
     (collection, vcollection, db , client)
 }
+
+pub async fn find_users_by_name(usercollection: Collection<Users>, keyword_name: String) ->Vec<Users> {
+    use futures_util::StreamExt;
+    let options = FindOptions::builder()
+        .sort(doc! {"name": 1})
+        .build();
+
+    let regex = mongodb::bson::Regex {
+        pattern: keyword_name,
+        options: "i".to_string(),
+    };
+
+    let filter = doc! {"name": regex};
+
+    let mut cursor = usercollection.find(filter, options).await.unwrap();
+    let mut result = Vec::new();
+
+    while let Some(doc) = cursor.next().await {
+        if let Ok(doc) = doc {
+            result.push(doc);
+        }
+    }
+
+    result
+}
+
 
 async fn create_user(user_collection: Collection<Users>, username: String, password: String, name: String) -> ObjectId {
     let mut user_id = ObjectId::new();

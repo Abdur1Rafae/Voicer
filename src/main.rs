@@ -10,7 +10,7 @@ use mongodb::{Collection, bson::oid::ObjectId};
 #[tokio::main]
 
 async fn main() {
-    let (user_collection, voice_note_collection, DB, client) = connect_to_mongodb().await;
+    let (user_collection, voice_note_collection, db, client) = connect_to_mongodb().await;
 
     let mut input = String::new();
 
@@ -26,7 +26,7 @@ async fn main() {
                     authenticated= true;
                 } else if input.trim() == "l" {
                     let res_user = db_config::login(user_collection.clone()).await;
-                    match(res_user){
+                    match res_user {
                         Some(user)=>{
                             user_id = user._id;
                             authenticated = true;
@@ -49,7 +49,7 @@ async fn main() {
     let folder_name = format!("{}", user_id);
     fs::create_dir_all(&folder_name).unwrap(); // use create_dir_all to create the folder and its parent folders if they don't exist
 
-    println!("Would you like to tweet something? (y, n)");
+    println!("Would you like to tweet something or follow someone? (t , f)");
 
     input = String::new();
 
@@ -70,6 +70,20 @@ async fn main() {
                         }
                     }
                     Err(err) => println!("Error {}", err),
+                }
+            }
+            else if input.trim()== "f" {
+                println!("Enter the name");
+
+                input = String::new();
+
+                match io::stdin().read_line(&mut input) {
+                    Ok(_) => {
+                        println!("{:?}", db_config::find_users_by_name(user_collection.clone(), input).await);
+                    }
+                    Err(err) => {
+                        println!("Error {}", err);
+                    }
                 }
             }
         }
