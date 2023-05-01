@@ -85,7 +85,8 @@ async fn main() {
 
                 match io::stdin().read_line(&mut input) {
                     Ok(_) => {
-                        println!("{:?}", db_config::find_users_by_name(user_collection.clone(), input).await);
+                        let result = db_config::find_user_by_name(user_collection.clone(), input).await;
+                        println!("{:?}", result);
                     }
                     Err(err) => {
                         println!("Error {}", err);

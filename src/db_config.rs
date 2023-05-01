@@ -77,29 +77,27 @@ pub async fn connect_to_mongodb() -> (Collection<Users>, Collection<VoiceNote>, 
     (collection, vcollection, db , client)
 }
 
-pub async fn find_users_by_name(usercollection: Collection<Users>, keyword_name: String) ->Vec<Users> {
-    use futures_util::StreamExt;
-    let options = FindOptions::builder()
-        .sort(doc! {"name": 1})
-        .build();
+pub async fn find_user_by_name(collection: Collection<Users>, keyword_name: String) ->Option<String> {
+    let filter = doc! {"name": {"$regex": &format!("^{}$", keyword_name), "$options": "i"}};
 
-    let regex = mongodb::bson::Regex {
-        pattern: keyword_name,
-        options: "i".to_string(),
-    };
+    let mut user;
 
-    let filter = doc! {"name": regex};
-
-    let mut cursor = usercollection.find(filter, options).await.unwrap();
-    let mut result = Vec::new();
-
-    while let Some(doc) = cursor.next().await {
-        if let Ok(doc) = doc {
-            result.push(doc);
+    match collection.find_one(filter, None).await {
+        Ok(result) => match result {
+            Some(doc) => {
+                user = Some(doc.name);
+            }
+            None => {
+                user = None;
+            },
+        },
+        Err(e) => {
+            println!("Failed to get user: {}", e);
+            user = None;
         }
-    }
+    };
+    user
 
-    result
 }
 
 
@@ -171,7 +169,6 @@ async fn get_user_by_username(collection: Collection<Users>, username: String, p
             user = None
         }
     };
-    println!("{:?}", user);
     user
 }
 
