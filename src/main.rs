@@ -53,11 +53,9 @@ async fn main() {
         };
     }
    
-
-    // Call the create_user function to create a new user
-    println!("User created with ID: {:?}", user_id);
+    println!("User authenticated with ID: {:?}", user_id);
     let folder_name = format!("{}", user_id);
-    fs::create_dir_all(&folder_name).unwrap(); // use create_dir_all to create the folder and its parent folders if they don't exist
+    fs::create_dir_all(&folder_name).unwrap(); 
 
     println!("Would you like to tweet something or follow someone? (t , f)");
 
@@ -88,8 +86,27 @@ async fn main() {
                 match io::stdin().read_line(&mut input) {
                     Ok(_) => {
                         input = input.trim().to_string();
-                        let mut userlist = db_config::find_users_by_names(user_collection.clone(), &input).await;
-                        println!("{:?}", userlist);
+                        let mut userlist = db_config::find_users_by_names(user_collection.clone(), &input, user_id).await;
+                        println!("{:#?}", userlist);
+                        println!("Enter the ref number of user you would like to follow:");
+                        input = String::new();
+                        match io::stdin().read_line(&mut input){
+                            Ok(_) => {
+                                input = input.trim().to_string();
+                                let refNo = input.parse::<i32>().unwrap();
+                                let mut f_user_id = ObjectId::new();
+                                for item in userlist {
+                                    if item.refNo == refNo {
+                                        f_user_id = item._id;
+                                        break;
+                                    }
+                                }
+                                db_config::follow(user_collection, user_id, f_user_id).await;
+                            }
+                            Err(err) => {
+                                println!("Error {}", err);
+                            }
+                        } 
                     }
                     Err(err) => {
                         println!("Error {}", err);

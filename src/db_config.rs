@@ -18,6 +18,7 @@ pub struct Users {
     pub password: String,
     pub name: String,
     pub description: String,
+    // pub verified: bool,
     pub followers:Vec<ObjectId>,
     pub following:Vec<ObjectId>,
     pub voice_notes:Vec<ObjectId>
@@ -62,10 +63,12 @@ pub struct VoiceNote {
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub struct publicUser{
+    pub refNo: i32,
     pub _id: ObjectId,
     pub username:String,
     pub name: String,
     pub description: String,
+    // pub verified: bool,
     pub followers:Vec<ObjectId>,
     pub following:Vec<ObjectId>,
     pub voice_notes:Vec<ObjectId>
@@ -87,22 +90,28 @@ pub async fn connect_to_mongodb() -> (Collection<Users>, Collection<VoiceNote>, 
     (collection, vcollection, db , client)
 }
 
-pub async fn find_users_by_names(user_collection: Collection<Users> , name: &str) -> Vec<publicUser> {
+pub async fn find_users_by_names(user_collection: Collection<Users> , name: &str, user_id: ObjectId) -> Vec<publicUser> {
     let filter = doc! {"name": name};
     let mut cursor = user_collection.find(filter, None).await.expect("Failed to execute find.");
     let mut users = Vec::new();
+    let mut var=0;
     while let Some(result) = cursor.next().await {
         if let Ok(user) = result {
-            let pub_user = publicUser {
-                _id: user._id,
-                username: user.username,
-                name: user.name,
-                description: user.description,
-                followers: user.followers,
-                following: user.following,
-                voice_notes: user.voice_notes,
-            };
-            users.push(pub_user);
+            if user._id != user_id {
+                let pub_user = publicUser {
+                    refNo: var,
+                    _id: user._id,
+                    username: user.username,
+                    name: user.name,
+                    description: user.description,
+                    // verified: user.verified,
+                    followers: user.followers,
+                    following: user.following,
+                    voice_notes: user.voice_notes,
+                };
+                users.push(pub_user);
+                var= var+1;
+            }
         }
         
     }
@@ -118,6 +127,7 @@ async fn create_user(user_collection: Collection<Users>, username: String, passw
         username: username.clone(),
         password: password,
         name: name,
+        // verified: false,
         description: String::from(""),
         followers: Vec::new(),
         following: Vec::new(),
@@ -191,6 +201,25 @@ pub async fn update_user_name_by_username(user_collection: Collection<Users>, us
     }
     false
 }
+
+pub async fn follow(user_collection: Collection<Users>, user_id: ObjectId, fuser_id:ObjectId) {
+    let filter = doc! {"_id": user_id};
+
+    let update = doc! { "$push": { "following": fuser_id.to_hex()} };
+
+    let options = UpdateOptions::builder().build();
+
+    let result = user_collection.update_one(filter, update, options).await; 
+
+    let filter2 = doc!{"_id": fuser_id};
+
+    let update2= doc! {"$push" : {"followers": user_id.to_hex()}};
+
+    let options2 = UpdateOptions::builder().build();
+
+    let result2 = user_collection.update_one(filter2, update2, options2).await;
+}
+
 pub async fn update_password_by_username(user_collection: Collection<Users>, username: &str, new_password: &str) -> bool {
     let filter = doc! { "username": username };
     let update = doc! { "$set": { "password": new_password } };
@@ -200,6 +229,7 @@ pub async fn update_password_by_username(user_collection: Collection<Users>, use
     }
     false
 }
+
 pub async fn update_description_by_username(user_collection: Collection<Users>, username: &str, new_desc: &str) -> bool {
     let filter = doc! { "username": username };
     let update = doc! { "$set": { "description": new_desc } };
@@ -251,15 +281,13 @@ async fn save_voice_note(collection: Collection<Users> ,userid: ObjectId, v_id: 
     let filter = doc! { "_id": userid };
 
     // Create an update document to append the voice note ID to the `voice_notes` array
-    let update = doc! { "$push": { "voice_notes": v_id.clone().to_hex()} };
+    let update = doc! { "$push": { "voice_notes": v_id.to_hex()} };
 
     // Create an UpdateOptions instance with default options
     let options = UpdateOptions::builder().build();
 
     // Call the update_one method on the collection with the filter, update, and options
     let result = collection.update_one(filter, update, options).await;
-
-    println!("Audio file saved in MongoDB using GridFS!");
 }
 
 
