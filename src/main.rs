@@ -13,9 +13,7 @@ async fn main() {
     
     
     //checking find users by names functions
-    // let (user_collection, voice_note_collection, db, client) = connect_to_mongodb().await;
-    // let mut userlist = db_config::find_users_by_names(user_collection.clone(), "Abdur Rafae").await;
-    // println!("{:?}", userlist);
+    let (user_collection, voice_note_collection, db, client) = connect_to_mongodb().await;
     
     let mut input = String::new();
 
@@ -87,11 +85,11 @@ async fn main() {
             else if input.trim()== "f" {
                 println!("Enter the name");
                 input = String::new();
-
                 match io::stdin().read_line(&mut input) {
                     Ok(_) => {
-                        //let result = db_config::find_users_by_names(user_collection.clone(), input).await;
-                        //println!("{:?}", result);
+                        input = input.trim().to_string();
+                        let mut userlist = db_config::find_users_by_names(user_collection.clone(), &input).await;
+                        println!("{:?}", userlist);
                     }
                     Err(err) => {
                         println!("Error {}", err);
