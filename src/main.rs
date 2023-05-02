@@ -10,9 +10,6 @@ use mongodb::{Collection, bson::oid::ObjectId};
 #[tokio::main]
 
 async fn main() {
-    
-    
-    //checking find users by names functions
     let (user_collection, voice_note_collection, db, client) = connect_to_mongodb().await;
     
     let mut input = String::new();
@@ -57,7 +54,7 @@ async fn main() {
     let folder_name = format!("{}", user_id);
     fs::create_dir_all(&folder_name).unwrap(); 
 
-    println!("Would you like to tweet something or follow someone? (t , f)");
+    println!("Would you like to tweet something, follow someone or comment on a tweet? (t , f, c)");
 
     input = String::new();
 
@@ -107,6 +104,34 @@ async fn main() {
                                 println!("Error {}", err);
                             }
                         } 
+                    }
+                    Err(err) => {
+                        println!("Error {}", err);
+                    }
+                }
+            }
+            else if input.trim() == "c" {
+                println!("Enter the voice note id");
+                input = String::new();
+
+                match io::stdin().read_line(&mut input) {
+                    Ok(_) => {
+                        input = input.trim().to_string();
+                        let mut file_name= ObjectId::new();
+                        file_name= db_config::create_comment(voice_note_collection.clone(), user_collection.clone(), user_id, input).await;
+                        let directory = format!("{}/{}.wav", folder_name, file_name.to_hex());
+                        match ac::record(None) {
+                            Ok(clip) => {
+                                println!("Reply recorded!");
+                                match clip.export(format!("{}" , directory).as_str()) {
+                                    Ok(_) => {
+                                        println!("Successfully saved!");
+                                    }
+                                    Err(err) => println!("Error {}", err),
+                                }
+                            }
+                            Err(err) => println!("Error {}", err),
+                        }
                     }
                     Err(err) => {
                         println!("Error {}", err);

@@ -1,10 +1,6 @@
 use mongodb::{Client, Collection  , Database};
-use mongodb::options::FindOneOptions;
 use mongodb::options::FindOneAndUpdateOptions;
-use futures_util::io::AsyncReadExt;
-use mongodb::bson::{self,oid::ObjectId, doc, Bson};
-use regex::Regex;
-use mongodb::{options::FindOptions};
+use mongodb::bson::{self,oid::ObjectId, doc};
 use mongodb::options::UpdateOptions;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -53,7 +49,7 @@ pub struct Reaction{
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VoiceNote {
-    pub v_id: ObjectId,
+    pub _id: ObjectId,
     pub user_id: ObjectId,
     pub is_post: bool,
     pub replies: Vec<ObjectId>,
@@ -121,7 +117,7 @@ pub async fn find_users_by_names(user_collection: Collection<Users> , name: &str
 
 
 async fn create_user(user_collection: Collection<Users>, username: String, password: String, name: String) -> ObjectId {
-    let mut user_id = ObjectId::new();
+    let user_id = ObjectId::new();
     let new_user = Users {
         _id: user_id,
         username: username.clone(),
@@ -138,7 +134,7 @@ async fn create_user(user_collection: Collection<Users>, username: String, passw
     let filter = doc! { "username": username };
     let result = user_collection.find_one(filter, None).await;
     let user:ObjectId = match result.expect("Error finding user") {
-        Some(user) => { 
+        Some(_) => { 
             println!("User with email already exists");
             ObjectId::parse_str("f0f0f0f0f0f0f0f0f0f0f0f0").unwrap()},
         None => {
@@ -152,9 +148,9 @@ async fn create_user(user_collection: Collection<Users>, username: String, passw
 }
 
 pub async fn create_post(voice_collection: Collection<VoiceNote>, user_collection: Collection<Users>, user_id: ObjectId) -> ObjectId {
-    let mut voice_id = ObjectId::new();
+    let voice_id = ObjectId::new();
     let new_voice_note = VoiceNote {
-        v_id: voice_id,
+        _id: voice_id,
         user_id: user_id,
         is_post: true,
         replies: Vec::new(),
@@ -164,6 +160,32 @@ pub async fn create_post(voice_collection: Collection<VoiceNote>, user_collectio
     new_voice_note.insert_one(voice_collection.clone()).await;
     save_voice_note(user_collection, user_id, voice_id).await;
     voice_id
+}
+
+pub async fn create_comment(voice_collection: Collection<VoiceNote>, user_collection: Collection<Users>, user_id: ObjectId, voice_id: String)->ObjectId {
+    let comment_id = ObjectId::new();
+    let new_voice_note = VoiceNote {
+        _id: comment_id,
+        user_id: user_id,
+        is_post: false,
+        replies: Vec::new(),
+        reactions: Vec::new(),
+        timestamp: Utc::now()
+    };
+    new_voice_note.insert_one(voice_collection.clone()).await;
+    save_voice_note(user_collection, user_id, comment_id).await;
+    add_reply(voice_collection, voice_id, comment_id).await;
+    comment_id
+}
+
+pub async fn add_reply(voice_collection: Collection<VoiceNote>, voice_id: String, comment_id: ObjectId) {
+    let filter = doc! {"_id": ObjectId::parse_str(voice_id).unwrap()};
+
+    let update = doc! { "$push": { "replies": comment_id.to_hex()} };
+
+    let options = UpdateOptions::builder().build();
+
+    let result = voice_collection.update_one(filter, update, options).await; 
 }
 
 async fn get_user_by_username(collection: Collection<Users>, username: String, password: String) -> Option<Users> {
@@ -277,16 +299,13 @@ pub async fn login(user_collection: Collection<Users>) -> Option<Users> {
 }
 
 async fn save_voice_note(collection: Collection<Users> ,userid: ObjectId, v_id: ObjectId) {
-    // Create a filter to match the user with the given ID
+
     let filter = doc! { "_id": userid };
 
-    // Create an update document to append the voice note ID to the `voice_notes` array
     let update = doc! { "$push": { "voice_notes": v_id.to_hex()} };
 
-    // Create an UpdateOptions instance with default options
     let options = UpdateOptions::builder().build();
 
-    // Call the update_one method on the collection with the filter, update, and options
     let result = collection.update_one(filter, update, options).await;
 }
 
