@@ -66,7 +66,6 @@ async fn main() {
                 let directory = format!("{}/{}.wav", folder_name, file_name.to_hex());
                 match ac::record(None) {
                     Ok(clip) => {
-                        println!("Successfully recorded!");
                         match clip.export(format!("{}" , directory).as_str()) {
                             Ok(_) => {
                                 println!("Successfully saved!");
@@ -122,10 +121,9 @@ async fn main() {
                         let directory = format!("{}/{}.wav", folder_name, file_name.to_hex());
                         match ac::record(None) {
                             Ok(clip) => {
-                                println!("Reply recorded!");
                                 match clip.export(format!("{}" , directory).as_str()) {
                                     Ok(_) => {
-                                        println!("Successfully saved!");
+                                        println!("Reply saved!");
                                     }
                                     Err(err) => println!("Error {}", err),
                                 }
