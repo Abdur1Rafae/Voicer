@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::io;
 use futures_util::StreamExt;
+use std::fs;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Users {
@@ -321,27 +322,58 @@ async fn get_all_following(user_collection: Collection<Users> , user_id: ObjectI
         }        
     }
     following
-
 }
 
-pub async fn make_paths(user_collection:Collection<Users> , user_id:ObjectId) -> Vec<String> {
+
+
+pub async fn make_paths(voice_collection: Collection<VoiceNote>, voice_id: ObjectId) -> String {
+    let filter = doc! {"_id": voice_id};
+    let result = voice_collection.find_one(filter, None).await;
+    let mut user:String = String::new();
+    user = match result.expect("Error finding user") {
+        Some(result) => { 
+            result.user_id.to_hex() + "\\" + &voice_id.to_hex() + ".wav"
+        },
+        None => {
+            println!("No user found");
+            String::new()
+        }
+
+    };
+        
+    user    
+}
+
+pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> , voice_collection:Collection<VoiceNote> , user_id:ObjectId) -> Vec<VoiceNote>{
     let following = get_all_following(user_collection.clone(), user_id).await;
-    let mut paths = Vec::new();
-    for f in following {
-         match fs::read_dir(f) {
-        Ok(entries) => {
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    println!("{}", entry.file_name().to_string_lossy());
-                }
+        let mut voice_ids = Vec::new();
+        for i in following {
+            let filter = doc! {"_id": i};
+            let mut cursor = user_collection.find(filter, None).await.expect("Failed to execute find.");
+            while let Some(result) = cursor.next().await {
+                if let Ok(user) = result {
+                    for k in user.voice_notes {
+                        let filter = doc! {"_id": k};
+                        let mut cursor = voice_collection.find(filter, None).await.expect("Failed to execute find.");            
+                        while let Some(vresult) = cursor.next().await {
+                            if let Ok(voice) = vresult {
+                                voice_ids.push(voice);
+                            }
+                        }
+                    }
+                }        
             }
         }
-        Err(e) => {
-            eprintln!("Error reading directory: {}", e);
-        }
-    }
-paths    
+    voice_ids
 }
+
+pub fn sort_voice_notes_by_timestamp_desc(notes: &mut Vec<VoiceNote>) {
+    println ! ("{:?}" , notes[0].timestamp.timestamp());
+    println ! ("{:?}" , notes[1].timestamp.timestamp());
+    println ! ("{:?}" , notes[2].timestamp.timestamp());
+    notes.sort_by(|x, y| y.timestamp.partial_cmp(&x.timestamp).unwrap());
+}
+
 
 
 fn main() {}
