@@ -45,6 +45,7 @@ pub enum ReactionType{
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Reaction{
     user_id:ObjectId,
+    #[serde(rename = "ReactionType")]
     reaction: ReactionType
 }
 
@@ -76,6 +77,18 @@ impl VoiceNote{
         let new_vn = self.clone();
         collection.insert_one(new_vn, None).await.unwrap();
     }
+}
+
+pub struct replies{
+    pub _id: ObjectId,
+    pub user_id: ObjectId,
+}
+
+pub struct conversation{
+    pub v_id: ObjectId,
+    pub v_user_id: ObjectId,
+    pub reactions: Vec<Reaction>,
+    pub replies: Vec<replies>
 }
 
 pub async fn connect_to_mongodb() -> (Collection<Users>, Collection<VoiceNote>, Database, Client) {
@@ -148,6 +161,25 @@ async fn create_user(user_collection: Collection<Users>, username: String, passw
     user
 }
 
+
+pub async fn react_to_quote(voice_collection: Collection<VoiceNote>, v_id: ObjectId, user_id: ObjectId, reaction: ReactionType) {
+    let filter = doc!{"_id": v_id};
+
+    let user_reaction = Reaction{
+        user_id: user_id,
+        reaction: reaction,
+    };
+
+    let reaction_doc = bson::to_document(&user_reaction)
+    .expect("Failed to serialize reaction");
+
+    let update = doc! { "$push": { "reactions": reaction_doc} };
+
+    let options = UpdateOptions::builder().build();
+
+    let result = voice_collection.update_one(filter, update, options).await; 
+}
+
 pub async fn create_post(voice_collection: Collection<VoiceNote>, user_collection: Collection<Users>, user_id: ObjectId) -> ObjectId {
     let voice_id = ObjectId::new();
     let new_voice_note = VoiceNote {
@@ -187,6 +219,65 @@ pub async fn add_reply(voice_collection: Collection<VoiceNote>, voice_id: String
     let options = UpdateOptions::builder().build();
 
     let result = voice_collection.update_one(filter, update, options).await; 
+}
+
+pub async fn create_conversation (voice_collection: Collection<VoiceNote>, v_id: ObjectId,) -> conversation {
+    let filter = doc! { "_id": v_id };
+
+    let mut post= VoiceNote { _id: ObjectId::new(), user_id: ObjectId::new(), is_post: false, replies: vec![], reactions: vec![], timestamp: Utc::now() };
+
+    match voice_collection.find_one(filter, None).await {
+        Ok(result) => match result {
+            Some(doc) => {
+                    post=doc;
+                }
+            None => {}
+        },
+        Err(e) => {
+            println!("Failed to get user: {}", e);
+        }
+    };
+
+    let mut con_replies = Vec::new();
+
+    for item in post.replies{
+        let reply = replies {
+            _id: item,
+            user_id: get_user_of_vn(voice_collection.clone(), item).await.unwrap(),
+        };
+        con_replies.push(reply);
+    };
+
+    let result = conversation {
+        v_id: post._id,
+        v_user_id: post.user_id,
+        reactions: post.reactions,
+        replies: con_replies, 
+    };
+
+    result
+
+}
+
+async fn get_user_of_vn(voice_collection: Collection<VoiceNote>, v_id: ObjectId) -> Option<ObjectId> {
+    let filter = doc! {"_id": v_id};
+
+    let mut user:Option<ObjectId>;
+
+    match voice_collection.find_one(filter, None).await {
+        Ok(result) => match result{
+            Some(doc)=>{
+                user = Some(doc.user_id);
+            }
+            None => user=None,
+        }
+        Err(e) => {
+            println!("Failed to get user: {}", e);
+            user = None
+        }
+    }
+
+    user
 }
 
 async fn get_user_by_username(collection: Collection<Users>, username: String, password: String) -> Option<Users> {

@@ -57,7 +57,7 @@ async fn main() {
     let folder_name = format!("{}", user_id);
     fs::create_dir_all(&folder_name).unwrap(); 
 
-    println!("Would you like to tweet something, follow someone or comment on a tweet? (t , f, c)");
+    println!("Would you like to tweet something, follow someone or comment on a tweet? (t , f, c, rr)");
 
     input = String::new();
 
@@ -69,7 +69,6 @@ async fn main() {
                 let directory = format!("{}/{}.wav", folder_name, file_name.to_hex());
                 match ac::record(None) {
                     Ok(clip) => {
-                        println!("Successfully recorded!");
                         match clip.export(format!("{}" , directory).as_str()) {
                             Ok(_) => {
                                 println!("Successfully saved!");
@@ -125,10 +124,9 @@ async fn main() {
                         let directory = format!("{}/{}.wav", folder_name, file_name.to_hex());
                         match ac::record(None) {
                             Ok(clip) => {
-                                println!("Reply recorded!");
                                 match clip.export(format!("{}" , directory).as_str()) {
                                     Ok(_) => {
-                                        println!("Successfully saved!");
+                                        println!("Reply saved!");
                                     }
                                     Err(err) => println!("Error {}", err),
                                 }
@@ -136,6 +134,38 @@ async fn main() {
                             Err(err) => println!("Error {}", err),
                         }
                     }
+                    Err(err) => {
+                        println!("Error {}", err);
+                    }
+                }
+            }
+            else if input.trim() == "rr" {
+                println!("Enter the voice note id");
+                input = String::new();
+
+                match io::stdin().read_line(&mut input) {
+                    Ok(_) => {
+                        input = input.trim().to_string();
+                        let v_id= ObjectId::parse_str(input.clone()).unwrap();
+                        input = String::new();
+
+                        println!("Enter 0 to react SHUT UP, or 1 to react SPEAK UP");
+                        
+                        match io::stdin().read_line(&mut input) {
+                            Ok(_) => {
+                                input = input.trim().to_string();
+                                let refNo = input.parse::<i32>().unwrap();
+                                let reaction: db_config::ReactionType = match refNo {
+                                    0 => db_config::ReactionType::ShutUp,
+                                    _ => db_config::ReactionType::SpeakUp,
+                                };
+                                db_config::react_to_quote(voice_note_collection,v_id,user_id,reaction).await;
+                            }
+                            Err(err) => {
+                                println!("Error {}", err);
+                            }
+                        }
+                    },
                     Err(err) => {
                         println!("Error {}", err);
                     }
