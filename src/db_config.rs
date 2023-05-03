@@ -54,6 +54,7 @@ pub struct VoiceNote {
     pub _id: ObjectId,
     pub user_id: ObjectId,
     pub is_post: bool,
+    pub data: Vec<i16>,
     pub replies: Vec<ObjectId>,
     pub reactions: Vec<Reaction>,
     #[serde(with = "chrono::serde::ts_seconds")]
@@ -78,6 +79,13 @@ impl VoiceNote{
         collection.insert_one(new_vn, None).await.unwrap();
     }
 }
+
+
+// impl Ord for VoiceNote {
+//     fn cmp(&self, other: &Self) -> Ordering {
+//         self.timestamp.cmp(&other.timestamp)
+//     }
+// }
 
 pub struct replies{
     pub _id: ObjectId,
@@ -180,27 +188,52 @@ pub async fn react_to_quote(voice_collection: Collection<VoiceNote>, v_id: Objec
     let result = voice_collection.update_one(filter, update, options).await; 
 }
 
-pub async fn create_post(voice_collection: Collection<VoiceNote>, user_collection: Collection<Users>, user_id: ObjectId) -> ObjectId {
-    let voice_id = ObjectId::new();
+pub async fn create_post(voice_collection: Collection<VoiceNote>, user_collection: Collection<Users>, user_id: ObjectId, data: Vec<i16>, voice_id: ObjectId) {
     let new_voice_note = VoiceNote {
         _id: voice_id,
         user_id: user_id,
         is_post: true,
+        data: data,
         replies: Vec::new(),
         reactions: Vec::new(),
         timestamp: Utc::now()
     };
     new_voice_note.insert_one(voice_collection.clone()).await;
     save_voice_note(user_collection, user_id, voice_id).await;
-    voice_id
 }
 
-pub async fn create_comment(voice_collection: Collection<VoiceNote>, user_collection: Collection<Users>, user_id: ObjectId, voice_id: String)->ObjectId {
-    let comment_id = ObjectId::new();
+pub async fn convert_audio_to_vec(filename: &str) -> Vec<i16> {
+    let mut reader = hound::WavReader::open(filename).unwrap();
+    
+    let samples: Vec<i16> = reader.samples::<f32>().map(|x| (x.unwrap() * i16::MAX as f32) as i16).collect();
+
+    samples
+}
+
+pub async fn convert_vec_to_audio(filename:&str, data: Vec<i16>) {
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate: 44100,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut writer = hound::WavWriter::create(filename, spec).unwrap();
+    
+    // Write the samples to the file
+    for sample in data {
+        writer.write_sample(sample).unwrap();
+    }
+
+    // Finalize the WAV file
+    writer.finalize().unwrap();
+}
+
+pub async fn create_comment(voice_collection: Collection<VoiceNote>, user_collection: Collection<Users>, user_id: ObjectId, voice_id: String, comment_id: ObjectId, data: Vec<i16>) {
     let new_voice_note = VoiceNote {
         _id: comment_id,
         user_id: user_id,
         is_post: false,
+        data: data,
         replies: Vec::new(),
         reactions: Vec::new(),
         timestamp: Utc::now()
@@ -208,7 +241,6 @@ pub async fn create_comment(voice_collection: Collection<VoiceNote>, user_collec
     new_voice_note.insert_one(voice_collection.clone()).await;
     save_voice_note(user_collection, user_id, comment_id).await;
     add_reply(voice_collection, voice_id, comment_id).await;
-    comment_id
 }
 
 pub async fn add_reply(voice_collection: Collection<VoiceNote>, voice_id: String, comment_id: ObjectId) {
@@ -224,7 +256,7 @@ pub async fn add_reply(voice_collection: Collection<VoiceNote>, voice_id: String
 pub async fn create_conversation (voice_collection: Collection<VoiceNote>, v_id: ObjectId,) -> conversation {
     let filter = doc! { "_id": v_id };
 
-    let mut post= VoiceNote { _id: ObjectId::new(), user_id: ObjectId::new(), is_post: false, replies: vec![], reactions: vec![], timestamp: Utc::now() };
+    let mut post= VoiceNote { _id: ObjectId::new(), user_id: ObjectId::new(), is_post: false, replies: vec![],data: vec![], reactions: vec![], timestamp: Utc::now() };
 
     match voice_collection.find_one(filter, None).await {
         Ok(result) => match result {
@@ -463,6 +495,9 @@ pub fn sort_voice_notes_by_timestamp_desc(notes: &mut Vec<VoiceNote>) {
     println ! ("{:?}" , notes[1].timestamp.timestamp());
     println ! ("{:?}" , notes[2].timestamp.timestamp());
     notes.sort_by(|x, y| y.timestamp.partial_cmp(&x.timestamp).unwrap());
+    // notes.sort();
+    // notes.reverse();
+    // println!("{:?}",notes);
 }
 
 
