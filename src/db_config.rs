@@ -309,5 +309,39 @@ async fn save_voice_note(collection: Collection<Users> ,userid: ObjectId, v_id: 
     let result = collection.update_one(filter, update, options).await;
 }
 
+async fn get_all_following(user_collection: Collection<Users> , user_id: ObjectId) -> Vec<ObjectId> {
+    let filter = doc! {"_id": user_id};
+    let mut cursor = user_collection.find(filter, None).await.expect("Failed to execute find.");
+    let mut following = Vec::new();
+    while let Some(result) = cursor.next().await {
+        if let Ok(user) = result {
+            for i in user.following {
+                following.push(i);
+            }
+        }        
+    }
+    following
+
+}
+
+pub async fn make_paths(user_collection:Collection<Users> , user_id:ObjectId) -> Vec<String> {
+    let following = get_all_following(user_collection.clone(), user_id).await;
+    let mut paths = Vec::new();
+    for f in following {
+         match fs::read_dir(f) {
+        Ok(entries) => {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    println!("{}", entry.file_name().to_string_lossy());
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("Error reading directory: {}", e);
+        }
+    }
+paths    
+}
+
 
 fn main() {}

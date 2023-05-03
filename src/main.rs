@@ -10,8 +10,10 @@ use mongodb::{Collection, bson::oid::ObjectId};
 #[tokio::main]
 
 async fn main() {
+
     let (user_collection, voice_note_collection, db, client) = connect_to_mongodb().await;
-    
+    let paths = db_config::make_paths( user_collection.clone(), ObjectId::parse_str("644f79f076f7ad5bde441e7a".to_string()).unwrap()).await;
+    println!("{:#?}", paths);
     let mut input = String::new();
 
     let mut user_id=ObjectId::new();
