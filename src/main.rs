@@ -156,7 +156,7 @@ async fn main() {
                                     0 => db_config::ReactionType::ShutUp,
                                     _ => db_config::ReactionType::SpeakUp,
                                 };
-                                db_config::react_to_quote(voice_note_collection,v_id,user_id,reaction);
+                                db_config::react_to_quote(voice_note_collection,v_id,user_id,reaction).await;
                             }
                             Err(err) => {
                                 println!("Error {}", err);
