@@ -12,9 +12,7 @@ use std::path::Path;
 
 async fn main() {
     let (user_collection, voice_note_collection, db, client) = connect_to_mongodb().await;
-    // let mut voices = db_config::get_all_voice_ids_from_following(user_collection.clone(), voice_note_collection.clone(), ObjectId::parse_str("644f79f076f7ad5bde441e7a".to_string()).unwrap()).await;
-    // db_config::sort_voice_notes_by_timestamp_desc(&mut voices);
-    // println!("{:?}", voices);
+    
     let mut input = String::new();
 
     let mut user_id=ObjectId::new();
@@ -57,7 +55,7 @@ async fn main() {
     let folder_name = format!("{}", user_id);
     fs::create_dir_all(&folder_name).unwrap(); 
 
-    println!("Would you like to tweet something, follow someone or comment on a tweet? (t , f, c, rr)");
+    println!("Would you like to tweet something, follow someone or comment on a tweet or go to home page? (t , f, c, rr, h)");
 
     input = String::new();
 
@@ -180,6 +178,11 @@ async fn main() {
                         println!("Error {}", err);
                     }
                 }
+            }
+            else{
+                let mut voices = db_config::get_all_voice_ids_from_following(user_collection.clone(), voice_note_collection.clone(), ObjectId::parse_str(user_id.to_string()).unwrap()).await;
+                db_config::sort_voice_notes_by_timestamp_desc(&mut voices);
+                println!("{:?}", voices);
             }
         }
         Err(e) => {
