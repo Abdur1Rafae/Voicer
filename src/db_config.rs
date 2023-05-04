@@ -58,7 +58,7 @@ pub struct VoiceNote {
     pub replies: Vec<ObjectId>,
     pub reactions: Vec<Reaction>,
     #[serde(with = "chrono::serde::ts_seconds")]
-    timestamp: DateTime<Utc>,
+    pub timestamp: DateTime<Utc>,
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub struct publicUser{
@@ -446,25 +446,6 @@ async fn get_all_following(user_collection: Collection<Users> , user_id: ObjectI
 }
 
 
-
-pub async fn make_paths(voice_collection: Collection<VoiceNote>, voice_id: ObjectId) -> String {
-    let filter = doc! {"_id": voice_id};
-    let result = voice_collection.find_one(filter, None).await;
-    let mut user:String = String::new();
-    user = match result.expect("Error finding user") {
-        Some(result) => { 
-            result.user_id.to_hex() + "\\" + &voice_id.to_hex() + ".wav"
-        },
-        None => {
-            println!("No user found");
-            String::new()
-        }
-
-    };
-        
-    user    
-}
-
 pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> , voice_collection:Collection<VoiceNote> , user_id:ObjectId) -> Vec<VoiceNote>{
     let following = get_all_following(user_collection.clone(), user_id).await;
     println!("you follow {:?}", following);
@@ -477,8 +458,8 @@ pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> 
                     for k in user.voice_notes {
                         let filter = doc! {"_id": k};
                         let mut cursor = voice_collection.find(filter, None).await.expect("Failed to execute find.");            
-                        while let Some(vresult) = cursor.next().await {
-                            if let Ok(voice) = vresult {
+                        while let Some(result) = cursor.next().await {
+                            if let Ok(voice) = result {
                                 voice_ids.push(voice);
                             }
                         }
@@ -489,9 +470,10 @@ pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> 
     voice_ids
 }
 
-pub fn sort_voice_notes_by_timestamp_desc(notes: &mut Vec<VoiceNote>) {
+pub fn sort_voice_notes_by_timestamp_desc(notes : &mut Vec<VoiceNote>) {
+    
+    notes.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
-    notes.sort_by(|x, y| y.timestamp.partial_cmp(&x.timestamp).unwrap());
     // notes.sort();
     // notes.reverse();
     // println!("{:?}",notes);
