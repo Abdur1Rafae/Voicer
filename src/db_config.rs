@@ -467,6 +467,7 @@ pub async fn make_paths(voice_collection: Collection<VoiceNote>, voice_id: Objec
 
 pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> , voice_collection:Collection<VoiceNote> , user_id:ObjectId) -> Vec<VoiceNote>{
     let following = get_all_following(user_collection.clone(), user_id).await;
+    println!("you follow {:?}", following);
         let mut voice_ids = Vec::new();
         for i in following {
             let filter = doc! {"_id": i};
@@ -489,9 +490,7 @@ pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> 
 }
 
 pub fn sort_voice_notes_by_timestamp_desc(notes: &mut Vec<VoiceNote>) {
-    println ! ("{:?}" , notes[0].timestamp.timestamp());
-    println ! ("{:?}" , notes[1].timestamp.timestamp());
-    println ! ("{:?}" , notes[2].timestamp.timestamp());
+
     notes.sort_by(|x, y| y.timestamp.partial_cmp(&x.timestamp).unwrap());
     // notes.sort();
     // notes.reverse();
