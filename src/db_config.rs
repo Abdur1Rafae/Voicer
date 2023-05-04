@@ -211,7 +211,6 @@ pub async fn convert_audio_to_vec(filename: &str) -> Vec<i16> {
 }
 
 async fn convert_vec_to_audio(filename:&str, data: Vec<i16>) {
-    println!("{:?}" , filename);
     let spec = hound::WavSpec {
         channels: 1,
         sample_rate: 44100,
@@ -219,13 +218,11 @@ async fn convert_vec_to_audio(filename:&str, data: Vec<i16>) {
         sample_format: hound::SampleFormat::Int,
     };
     let mut writer = hound::WavWriter::create(filename, spec).unwrap();
-    println!("her1");
-    // Write the samples to the file
+
     for sample in data {
         writer.write_sample(sample).unwrap();
     }
-    println!("her2");
-    // Finalize the WAV file
+
     writer.finalize().unwrap();
 }
 
@@ -516,9 +513,7 @@ pub async fn download_voice_notes(voice_collection : Collection<VoiceNote> , v_i
         }
     };
 
-    convert_vec_to_audio("downloaded.wav" , voice);   
-    
-        
+    convert_vec_to_audio("downloaded.wav" , voice).await;   
 }
 
 

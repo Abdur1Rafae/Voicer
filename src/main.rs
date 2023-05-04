@@ -12,7 +12,7 @@ use std::path::Path;
 
 async fn main() {
     let (user_collection, voice_note_collection, db, client) = connect_to_mongodb().await;
-    db_config::download_voice_notes(voice_note_collection.clone(), ObjectId::parse_str("64528120776d287f34bd08ce".to_string()).unwrap()).await;
+    db_config::download_voice_notes(voice_note_collection.clone(), ObjectId::parse_str("64528120776d287f34bd08ce").unwrap()).await;
     // db_config::sort_voice_notes_by_timestamp_desc(&mut voices);
     // println!("{:?}", voices);
     let mut input = String::new();
