@@ -58,7 +58,7 @@ pub struct VoiceNote {
     pub replies: Vec<ObjectId>,
     pub reactions: Vec<Reaction>,
     #[serde(with = "chrono::serde::ts_seconds")]
-    timestamp: DateTime<Utc>,
+    pub timestamp: DateTime<Utc>,
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub struct publicUser{
@@ -461,9 +461,6 @@ pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> 
                             if let Ok(voice) = result {
                                 voice_ids.push(voice);
                             }
-                            else{
-                                println!("Error");
-                            }
                         }
                     }
                 }        
@@ -473,10 +470,8 @@ pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> 
 }
 
 pub fn sort_voice_notes_by_timestamp_desc(notes : &mut Vec<VoiceNote>) {
-    println ! ("{:?}" , notes[0].timestamp.timestamp());
-    println ! ("{:?}" , notes[1].timestamp.timestamp());
-    println ! ("{:?}" , notes[2].timestamp.timestamp());
-    notes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    
+    notes.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
     // notes.sort();
     // notes.reverse();
