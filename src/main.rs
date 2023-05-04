@@ -12,7 +12,6 @@ use std::path::Path;
 
 async fn main() {
     let (user_collection, voice_note_collection, db, client) = connect_to_mongodb().await;
-    //db_config::download_voice_notes(voice_note_collection.clone(), ObjectId::parse_str("64528120776d287f34bd08ce").unwrap()).await;
 
     let mut input = String::new();
 
@@ -184,7 +183,8 @@ async fn main() {
                 let mut voices = db_config::get_all_voice_ids_from_following(user_collection.clone(), voice_note_collection.clone(), ObjectId::parse_str(user_id.to_string()).unwrap()).await;
                 db_config::sort_voice_notes_by_timestamp_desc(&mut voices);
                 for i in 0..voices.len() {
-                    println!("{}: {:?}",  voices[i]._id , voices[i].timestamp.timestamp());
+                    let mut filename= voices[i]._id.to_string()+ ".wav";
+                    db_config::convert_vec_to_audio(&filename, voices[i].data.clone()).await;
                 }
             }
         }

@@ -210,7 +210,7 @@ pub async fn convert_audio_to_vec(filename: &str) -> Vec<i16> {
     samples
 }
 
-async fn convert_vec_to_audio(filename:&str, data: Vec<i16>) {
+pub async fn convert_vec_to_audio(filename:&str, data: Vec<i16>) {
     let spec = hound::WavSpec {
         channels: 1,
         sample_rate: 44100,
