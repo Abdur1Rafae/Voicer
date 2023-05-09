@@ -138,7 +138,7 @@ pub async fn find_users_by_names(user_collection: Collection<Users> , name: &str
 }
 
 
-async fn create_user(user_collection: Collection<Users>, username: String, password: String, name: String) -> ObjectId {
+pub async fn create_user(user_collection: Collection<Users>, username: String, password: String, name: String) -> ObjectId {
     let user_id = ObjectId::new();
     let new_user = Users {
         _id: user_id,
@@ -310,7 +310,7 @@ async fn get_user_of_vn(voice_collection: Collection<VoiceNote>, v_id: ObjectId)
     user
 }
 
-async fn get_user_by_username(collection: Collection<Users>, username: String, password: String) -> Option<Users> {
+pub async fn get_user_by_username(collection: Collection<Users>, username: String, password: String) -> Option<Users> {
     let filter = doc! { "username": username };
 
     let mut user;
