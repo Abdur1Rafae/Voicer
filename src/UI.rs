@@ -249,7 +249,9 @@ impl Gui {
                     });
                 self.userid = response._id.clone();
                 println!("login successful : {:?}", response._id);
+                
                 self.current_page = Page::Home;
+                
             }
                 if let Some(error_message) = &self.error_message {
                     // Display error message if it exists
@@ -268,31 +270,33 @@ impl Gui {
             });
     }
 
+    
+
     // Function to show the home page UI
     fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
-        println!("{:?}", self.user_collection);
         ui.heading("Home Page");
         ui.add_space(10.0);
         ui.label(format!("Welcome, {}!", self.username)); // Display welcome message with user's name
-
-
+        
         let rt= Runtime::new().unwrap();
         let userid = self.userid.clone();
         let another_uc = self.user_collection.clone().unwrap();
         let vc = self.voice_note_collection.clone().unwrap();
+        
+       
         let response = rt.block_on( async move
             {
                 let response = tokio::spawn
                 ( async move
                     {
-                        let response = db_config::get_all_voice_ids_from_following(another_uc, vc, userid).await;
+                        let response = db_config::get_all_voice_ids_from_following(another_uc ,vc ,userid ).await;
 
                         response
                     }
                 ).await.unwrap();
                 response
             });
-
+            println!("{:? }" , response);
         ui.horizontal(|ui| {
             if ui.button("My Files").clicked() {
                 // Redirect to My Files page

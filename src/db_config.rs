@@ -432,7 +432,7 @@ async fn save_voice_note(collection: Collection<Users> ,userid: ObjectId, v_id: 
 }
 
 async fn get_all_following(user_collection: Collection<Users> , user_id: ObjectId) -> Vec<ObjectId> {
-    println!("{:?}", user_id);
+    
     let filter = doc! {"_id": user_id};
     let mut cursor = user_collection.find(filter, None).await.expect("Failed to execute find.");
     let mut following = Vec::new();
@@ -443,6 +443,7 @@ async fn get_all_following(user_collection: Collection<Users> , user_id: ObjectI
             }
         }        
     }
+    println!("following {:?}", following);
     following
 }
 
