@@ -470,7 +470,7 @@ pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> 
             }
         }
     for i in &voice_ids {
-        download_voice_notes(voice_collection.clone(), i._id);
+        download_voice_notes(voice_collection.clone(), i._id).await;
     }
     voice_ids
 }
@@ -485,7 +485,7 @@ pub fn sort_voice_notes_by_timestamp_desc(notes : &mut Vec<VoiceNote>) {
 }
 
 pub async fn download_voice_notes(voice_collection : Collection<VoiceNote> , v_id : ObjectId){
-    let filter = doc! {"_id": v_id};
+    let filter = doc! {"_id": v_id.clone()};
     let result = voice_collection.find_one(filter, None).await;
     let mut voice:Vec<i16> = Vec::new();
     voice = match result.expect("Error finding voice") {
@@ -499,7 +499,9 @@ pub async fn download_voice_notes(voice_collection : Collection<VoiceNote> , v_i
         }
     };
 
-    convert_vec_to_audio("downloaded.wav" , voice).await;   
+    let mut filename = v_id.to_string() + ".wav";
+
+    convert_vec_to_audio(&filename , voice).await;   
 }
 
 
