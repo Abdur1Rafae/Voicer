@@ -8,16 +8,13 @@ edition = "2021"
 name = "main"
 path = "src/main.rs"
 
-
 [[bin]]
-name = "dbConfig"
-path = "src/db_config.rs"
-
-[[bin]]
-name = "login"
-path = "src/login.rs"
+name = "cli"
+path = "src/cli.rs"
 
 [dependencies]
+inquire = "0.6.1"
+inquirer = "0.1.0"
 eframe = "0.14.0"
 egui = "0.13"
 egui_glium = "0.13"
