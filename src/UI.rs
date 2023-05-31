@@ -228,30 +228,27 @@ impl Gui {
                         response
                     });
                 self.user_collection = Some(usercol.clone());
+                println!("{:?}", self.user_collection);
                 self.voice_note_collection = Some(voicecol.clone());
                 self.database = Some(database.clone());
                 self.client = Some(client.clone());
 
                 let another_uc = usercol.clone();
-                let vc = voicecol.clone();
 
                 let response = rt.block_on( async move
                     {
                         let response = tokio::spawn
                         ( async move
                             {
-                                let response = db_config::get_user_by_username(another_uc.clone(), username, pass).await;
-                                let user_iddd= response.unwrap()._id.clone();
-                                let response2 = db_config::get_all_voice_ids_from_following(another_uc ,vc , user_iddd).await;
-        
-                                (user_iddd,response2)
+                                let response = db_config::get_user_by_username(another_uc, username, pass).await;
+
+                                response
                             }
                         ).await.unwrap();
-                        response
+                        response.unwrap()
                     });
-                self.userid = response.0.clone();
-                println!("login successful : {:?}",response.0.clone() );
-
+                self.userid = response._id.clone();
+                println!("login successful : {:?}", response._id);
                 
                 self.current_page = Page::Home;
                 
@@ -281,8 +278,25 @@ impl Gui {
         ui.add_space(10.0);
         ui.label(format!("Welcome, {}!", self.username)); // Display welcome message with user's name
         
-       
+        let rt= Runtime::new().unwrap();
+        let userid = self.userid.clone();
+        let another_uc = self.user_collection.clone().unwrap();
+        let vc = self.voice_note_collection.clone().unwrap();
         
+       
+        let response = rt.block_on( async move
+            {
+                let response = tokio::spawn
+                ( async move
+                    {
+                        let response = db_config::get_all_voice_ids_from_following(another_uc ,vc ,userid ).await;
+
+                        response
+                    }
+                ).await.unwrap();
+                response
+            });
+            println!("{:? }" , response);
         ui.horizontal(|ui| {
             if ui.button("My Files").clicked() {
                 // Redirect to My Files page

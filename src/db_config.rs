@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::io;
 use futures_util::StreamExt;
 use std::fs;
+use inquire::{Text,Password};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Users {
@@ -104,7 +105,7 @@ pub async fn connect_to_mongodb() -> (Collection<Users>, Collection<VoiceNote>, 
     let db = client.database("Cluster0");
     let collection = db.collection::<Users>("users");
     let vcollection: Collection<VoiceNote>= db.collection::<VoiceNote>("Voice Notes");
-    println!("Connected to MongoDB");
+    println!("Connected to Database");
     (collection, vcollection, db , client)
 }
 
@@ -160,7 +161,7 @@ pub async fn create_user(user_collection: Collection<Users>, username: String, p
             println!("User with email already exists");
             ObjectId::parse_str("f0f0f0f0f0f0f0f0f0f0f0f0").unwrap()},
         None => {
-            println!("Creating new user");
+            println!("Creating new user, your email is your userid..");
             new_user.insert_one(user_collection.clone()).await;
             user_id
         }
@@ -322,7 +323,7 @@ pub async fn get_user_by_username(collection: Collection<Users>, username: Strin
                     user=Some(doc)
                 }
                 else{
-                    println!("Wrong password");
+                    println!("Password is incorrect, try again!");
                     user= None
                 }
             }
@@ -406,6 +407,29 @@ pub async fn sign_up(user_collection: Collection<Users>) -> ObjectId {
     new_user_id
 }
 
+pub async fn sign_up_scli(user_collection: Collection<Users>) -> ObjectId {
+    let email = Text::new("Please enter your email:")
+    .prompt()
+    .expect("Failed to read input.")
+    .trim()
+    .to_string();
+    let name = Text::new("Please enter your name:")
+        .prompt()
+        .expect("Failed to read input.")
+        .trim()
+        .to_string();
+    
+    let password = Password::new("Please confirm your password:")
+        .prompt()
+        .expect("Failed to read input.")
+        .trim()
+        .to_string();
+
+    let new_user_id = create_user(user_collection, email, password, name).await;
+    new_user_id
+
+}
+
 pub async fn login(user_collection: Collection<Users>) -> Option<Users> {
     println!("Please enter your username:");
     let mut username = String::new();
@@ -417,6 +441,18 @@ pub async fn login(user_collection: Collection<Users>) -> Option<Users> {
     io::stdin().read_line(&mut password).expect("Failed to read input.");
     password = password.trim().to_string();
 
+    get_user_by_username(user_collection, username, password).await
+}
+
+pub async fn login_scli(user_collection: Collection<Users>) -> Option<Users> {
+    let username = Text::new("Enter your username")
+                    .prompt()
+                    .unwrap();
+
+    let password = Password::new("Enter your Password")
+                    .without_confirmation()
+                    .prompt()
+                    .unwrap();
     get_user_by_username(user_collection, username, password).await
 }
 
@@ -470,7 +506,7 @@ pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> 
             }
         }
     for i in &voice_ids {
-        download_voice_notes(voice_collection.clone(), i._id).await;
+        download_voice_notes(voice_collection.clone(), i._id);
     }
     voice_ids
 }
@@ -485,7 +521,7 @@ pub fn sort_voice_notes_by_timestamp_desc(notes : &mut Vec<VoiceNote>) {
 }
 
 pub async fn download_voice_notes(voice_collection : Collection<VoiceNote> , v_id : ObjectId){
-    let filter = doc! {"_id": v_id.clone()};
+    let filter = doc! {"_id": v_id};
     let result = voice_collection.find_one(filter, None).await;
     let mut voice:Vec<i16> = Vec::new();
     voice = match result.expect("Error finding voice") {
@@ -499,9 +535,7 @@ pub async fn download_voice_notes(voice_collection : Collection<VoiceNote> , v_i
         }
     };
 
-    let mut filename = v_id.to_string() + ".wav";
-
-    convert_vec_to_audio(&filename , voice).await;   
+    convert_vec_to_audio("downloaded.wav" , voice).await;   
 }
 
 
