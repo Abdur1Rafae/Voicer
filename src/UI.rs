@@ -328,7 +328,7 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
 
                     // Play the audio file
                     if let Some(filename) = filenames.get(i) {
-                        let x = play_audio(filename);
+                         play_audio(filename);
                         // if ui.button("⏸️ Pause").clicked() {
                         //     // Pause the currently playing audio
                         //     pause_audio(&x);
@@ -366,7 +366,7 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
 
             // Play the audio files
             for filename in filenames {
-                let x = play_audio(&filename);
+            play_audio(&filename);
 
                 // ui.horizontal(|ui| {
                 //     if ui.button("⏸️ Pause").clicked() {
@@ -693,7 +693,7 @@ fn count_voicenotes() -> usize {
 use rodio::{source::Source};
 
 // Function to play the audio and return the Sink object
-fn play_audio(filename: &str) -> Sink {
+fn ad_play_audio(filename: &str) -> Sink {
     let (_stream, stream_handle) = OutputStream::try_default().unwrap();
     let sink = Sink::try_new(&stream_handle).unwrap();
     let file = File::open(filename).unwrap();
@@ -703,6 +703,18 @@ fn play_audio(filename: &str) -> Sink {
     sink.play();
 
     sink
+}
+
+fn play_audio(filename: &str) {
+    // Load the voice note file
+    let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+    let sink = Sink::try_new(&stream_handle).unwrap();
+    let file = File::open(filename).unwrap();
+    let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
+
+    // Play the voice note
+    sink.append(source);
+    sink.sleep_until_end();
 }
 
 // Function to pause the audio playback
