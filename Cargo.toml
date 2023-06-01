@@ -8,14 +8,10 @@ edition = "2021"
 name = "main"
 path = "src/main.rs"
 
-
 [[bin]]
-name = "dbConfig"
+name = "db_config"
 path = "src/db_config.rs"
 
-[[bin]]
-name = "login"
-path = "src/login.rs"
 
 [dependencies]
 eframe = "0.14.0"
