@@ -1,11 +1,18 @@
+use std::{fs::{self, File}, path::Path};
+
 use eframe::{run_native, epi::App, egui::{self}};
-use crate::db_config;
+use ::egui::color::srgba;
+use crate::db_config::{self, Users};
 use mongodb::{Client, Collection  , Database};
 use mongodb::bson::{self,oid::ObjectId};
-use tokio::{io, time::Instant};
-use tokio::task;
-use tokio::runtime::Runtime;
+use tokio::{io, time::Instant, runtime::Runtime};
+use tokio;
+use std::io::BufReader;
+use rodio::{OutputStream, Sink, source::Buffered};
+use std::{process::Command};
 
+use db_config::{connect_to_mongodb, VoiceNote};
+use record_audio::audio_clip::AudioClip as ac;
 
 // Enum to represent different pages/screens of the application
 enum Page {
@@ -68,7 +75,7 @@ impl Gui {
 
     pub fn new() -> Self {
         Self {
-            current_page: Page::Signup,
+            current_page: Page::Login,
             error_message: None,
             username: String::new(),
             email: String::new(),
@@ -182,7 +189,9 @@ impl Gui {
             });
         });
     }
-        
+
+
+
     // Function to show the login page UI
     fn login_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
         ui.heading("Login");
@@ -252,7 +261,6 @@ impl Gui {
                 self.userid = response.0.clone();
                 println!("login successful : {:?}",response.0.clone() );
 
-                
                 self.current_page = Page::Home;
                 
             }
@@ -275,37 +283,127 @@ impl Gui {
 
     
 
-    // Function to show the home page UI
-    fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
-        ui.heading("Home Page");
-        ui.add_space(10.0);
-        ui.label(format!("Welcome, {}!", self.username)); // Display welcome message with user's name
-        
-       
-        
-        ui.horizontal(|ui| {
-            if ui.button("My Files").clicked() {
-                // Redirect to My Files page
-                //self.current_page = Page::MyFiles;
-            }
-            if ui.button("Shared Files").clicked() {
-                // Redirect to Shared Files page
-                //self.current_page = Page::SharedFiles;
-            }
-            if ui.button("theme").clicked() {
-                //change mode to light mode
-                self.toggle_theme(ctx);
-            }
-            if ui.button("Logout").clicked() {
-                // Redirect to Login page and clear user data
-                self.username.clear();
-                self.password.clear();
-                self.confirm_password.clear();
-                self.error_message = None;
-                self.current_page = Page::Login;
-            }
+
+
+// Function to show the home page UI
+fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
+    
+
+    let folder_name = format!("{}", self.userid);
+    fs::create_dir_all(&folder_name).unwrap(); 
+    ui.heading("Voicer Home Page");
+    ui.add_space(10.0);
+    ui.label(format!("Welcome, {}!", self.username)); // Display welcome message with user's name
+
+    // Count the number of voicenotes
+    let voicenote_count = count_voicenotes();
+    ui.label(format!("You have {} voicenotes.", voicenote_count));
+
+    ui.add_space(10.0);
+
+    // Display voicenote posts
+    for i in 0..voicenote_count {
+        ui.collapsing(format!("Voicenote {}", i + 1), |ui| {
+            // Add content for each voicenote post here
+            ui.label("Voicenote content");
+
+            // Play single voicenote button
+            ui.horizontal(|ui| {
+                if ui.button("▶️ Play").clicked() {
+                    // Play the selected voicenote
+                    let directory = "."; // Main directory path
+                    let files = fs::read_dir(directory).unwrap();
+                    let mut filenames: Vec<String> = Vec::new(); // Vector to store filenames
+
+                    for file in files {
+                        if let Ok(file) = file {
+                            if let Some(extension) = file.path().extension() {
+                                if extension == "wav" {
+                                    let filename = file.path().to_str().unwrap().to_owned();
+                                    filenames.push(filename);
+                                }
+                            }
+                        }
+                    }
+
+                    // Play the audio file
+                    if let Some(filename) = filenames.get(i) {
+                        let x = play_audio(filename);
+                        // if ui.button("⏸️ Pause").clicked() {
+                        //     // Pause the currently playing audio
+                        //     pause_audio(&x);
+                        // }
+
+                        // if ui.button("⏹️ Stop").clicked() {
+                        //     // Stop the audio playback
+                        //     stop_audio(&x);
+                        // }
+                    }
+                }
+            });
         });
     }
+
+    ui.add_space(10.0);
+
+    ui.horizontal(|ui| {
+        if ui.button("▶️ Play All").clicked() {
+            // Play all voicenote files
+            let directory = "."; // Main directory path
+            let files = fs::read_dir(directory).unwrap();
+            let mut filenames: Vec<String> = Vec::new(); // Vector to store filenames
+
+            for file in files {
+                if let Ok(file) = file {
+                    if let Some(extension) = file.path().extension() {
+                        if extension == "wav" {
+                            let filename = file.path().to_str().unwrap().to_owned();
+                            filenames.push(filename);
+                        }
+                    }
+                }
+            }
+
+            // Play the audio files
+            for filename in filenames {
+                let x = play_audio(&filename);
+
+                // ui.horizontal(|ui| {
+                //     if ui.button("⏸️ Pause").clicked() {
+                //         // Pause the currently playing audio
+                //         pause_audio(&x);
+                //     }
+
+                //     if ui.button("⏹️ Stop").clicked() {
+                //         // Stop the audio playback
+                //         stop_audio(&x);
+                //     }
+                // });
+            }
+        }
+
+        if ui.button("📣 Tweet").clicked() {
+            // Tweet the voicenote
+            self.current_page=Page::MyProfile;                        
+        }
+        if ui.button("Theme").clicked() {
+            // Change mode to light mode
+            self.toggle_theme(ctx);
+        }
+
+        if ui.button("Logout").clicked() {
+            // Redirect to Login page and clear user data
+            self.username.clear();
+            self.password.clear();
+            self.confirm_password.clear();
+            self.error_message = None;
+            self.current_page = Page::Login;
+        }
+    });
+}
+
+
+
 
     // Function to show the My Files page UI
     fn my_files_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
@@ -556,20 +654,67 @@ impl App for Gui {
                     self.home_page(ctx, ui);
                 }
                 Page::MyProfile => {
-                    //self.my_files_page(ctx, ui);
+                    self.my_files_page(ctx, ui);
                 }
                 Page::MyPost => {
-                    //self.shared_files_page_1(ctx, ui);
+                    self.shared_files_page_1(ctx, ui);
                 },
                 Page::FollowerPost => {
-                    //self.shared_files_page_2(ctx, ui);
+                    self.shared_files_page_2(ctx, ui);
                 }
             }
         });
     }
 
     fn name(&self) -> &str {
-        "my gui"
+        "Voicer"
     }
 }
 
+// Function to count the number of .wav files in the main directory
+fn count_voicenotes() -> usize {
+    let directory = "."; // Main directory path
+    let files = fs::read_dir(directory).unwrap();
+    let mut count = 0;
+
+    for file in files {
+        if let Ok(file) = file {
+            if let Some(extension) = file.path().extension() {
+                if extension == "wav" {
+                    count += 1;
+                }
+            }
+        }
+    }
+
+    count
+}
+
+use rodio::{source::Source};
+
+// Function to play the audio and return the Sink object
+fn play_audio(filename: &str) -> Sink {
+    let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+    let sink = Sink::try_new(&stream_handle).unwrap();
+    let file = File::open(filename).unwrap();
+    let source = rodio::Decoder::new(BufReader::new(file)).unwrap().buffered();
+    
+    sink.append(source);
+    sink.play();
+
+    sink
+}
+
+// Function to pause the audio playback
+fn pause_audio(sink: &Sink) {
+    sink.pause();
+}
+
+// Function to stop the audio playback
+fn stop_audio(sink: &Sink) {
+    sink.stop();
+}
+
+async fn save_audio() {
+
+}
