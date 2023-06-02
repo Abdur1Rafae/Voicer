@@ -711,18 +711,6 @@ fn play_audio(filename: &str) {
     sink.sleep_until_end();
 }
 
-fn play_audio(filename: &str) {
-    // Load the voice note file
-    let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-    let sink = Sink::try_new(&stream_handle).unwrap();
-    let file = File::open(filename).unwrap();
-    let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
-
-    // Play the voice note
-    sink.append(source);
-    sink.sleep_until_end();
-}
-
 // Function to pause the audio playback
 fn pause_audio(sink: &Sink) {
     sink.pause();
