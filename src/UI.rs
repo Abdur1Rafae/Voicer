@@ -324,7 +324,7 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
 
             // Play the audio files
             for filename in filenames {
-                let x = play_audio(&filename);
+            play_audio(&filename);
 
                 // ui.horizontal(|ui| {
                 //     if ui.button("⏸️ Pause").clicked() {
@@ -707,6 +707,18 @@ fn play_audio(filename: &str) {
     let source = Decoder::new(BufReader::new(file)).unwrap();
 
     // Play the audio
+    sink.append(source);
+    sink.sleep_until_end();
+}
+
+fn play_audio(filename: &str) {
+    // Load the voice note file
+    let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+    let sink = Sink::try_new(&stream_handle).unwrap();
+    let file = File::open(filename).unwrap();
+    let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
+
+    // Play the voice note
     sink.append(source);
     sink.sleep_until_end();
 }
