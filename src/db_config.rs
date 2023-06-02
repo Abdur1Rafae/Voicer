@@ -36,23 +36,24 @@ impl Users {
     // }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum ReactionType{
     SpeakUp,
     ShutUp,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct Reaction{
     user_id:ObjectId,
     #[serde(rename = "ReactionType")]
     reaction: ReactionType
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VoiceNote {
     pub _id: ObjectId,
     pub user_id: ObjectId,
+    pub name: String,
     pub is_post: bool,
     pub data: Vec<i16>,
     pub replies: Vec<ObjectId>,
@@ -89,7 +90,7 @@ impl VoiceNote{
 
 pub struct replies{
     pub _id: ObjectId,
-    pub user_id: ObjectId,
+    pub user_id: (ObjectId, String),
 }
 
 pub struct conversation{
@@ -189,12 +190,30 @@ pub async fn react_to_quote(voice_collection: Collection<VoiceNote>, v_id: Objec
 }
 
 pub async fn create_post(voice_collection: Collection<VoiceNote>, user_collection: Collection<Users>, user_id: ObjectId, data: Vec<i16>, voice_id: ObjectId) {
+    let filter = doc! { "_id": user_id };
+
+    let mut user;
+
+    match user_collection.find_one(filter, None).await {
+        Ok(result) => match result {
+            Some(doc) => {
+                user = Some(doc);
+            }
+            None => user= None,
+        },
+        Err(e) => {
+            println!("Failed to get user: {}", e);
+            user = None
+        }
+    };
+    
     let new_voice_note = VoiceNote {
         _id: voice_id,
         user_id: user_id,
         is_post: true,
         data: data,
         replies: Vec::new(),
+        name: user.unwrap().name,
         reactions: Vec::new(),
         timestamp: Utc::now()
     };
@@ -227,11 +246,29 @@ pub async fn convert_vec_to_audio(filename:&str, data: Vec<i16>) {
 }
 
 pub async fn create_comment(voice_collection: Collection<VoiceNote>, user_collection: Collection<Users>, user_id: ObjectId, voice_id: String, comment_id: ObjectId, data: Vec<i16>) {
+    let filter = doc! { "_id": user_id };
+
+    let mut user;
+
+    match user_collection.find_one(filter, None).await {
+        Ok(result) => match result {
+            Some(doc) => {
+                user = Some(doc);
+            }
+            None => user= None,
+        },
+        Err(e) => {
+            println!("Failed to get user: {}", e);
+            user = None
+        }
+    };
+
     let new_voice_note = VoiceNote {
         _id: comment_id,
         user_id: user_id,
         is_post: false,
         data: data,
+        name: user.unwrap().name,
         replies: Vec::new(),
         reactions: Vec::new(),
         timestamp: Utc::now()
@@ -254,7 +291,7 @@ pub async fn add_reply(voice_collection: Collection<VoiceNote>, voice_id: String
 pub async fn create_conversation (voice_collection: Collection<VoiceNote>, v_id: ObjectId,) -> conversation {
     let filter = doc! { "_id": v_id };
 
-    let mut post= VoiceNote { _id: ObjectId::new(), user_id: ObjectId::new(), is_post: false, replies: vec![],data: vec![], reactions: vec![], timestamp: Utc::now() };
+    let mut post= VoiceNote { _id: ObjectId::new(), user_id: ObjectId::new(), is_post: false,name: String::new(), replies: vec![],data: vec![], reactions: vec![], timestamp: Utc::now() };
 
     match voice_collection.find_one(filter, None).await {
         Ok(result) => match result {
@@ -275,6 +312,7 @@ pub async fn create_conversation (voice_collection: Collection<VoiceNote>, v_id:
             _id: item,
             user_id: get_user_of_vn(voice_collection.clone(), item).await.unwrap(),
         };
+        download_voice_notes(voice_collection.clone(), item).await;
         con_replies.push(reply);
     };
 
@@ -289,15 +327,15 @@ pub async fn create_conversation (voice_collection: Collection<VoiceNote>, v_id:
 
 }
 
-async fn get_user_of_vn(voice_collection: Collection<VoiceNote>, v_id: ObjectId) -> Option<ObjectId> {
+async fn get_user_of_vn(voice_collection: Collection<VoiceNote>, v_id: ObjectId) -> Option<(ObjectId, String)> {
     let filter = doc! {"_id": v_id};
 
-    let mut user:Option<ObjectId>;
+    let mut user:Option<(ObjectId, String)>;
 
     match voice_collection.find_one(filter, None).await {
         Ok(result) => match result{
             Some(doc)=>{
-                user = Some(doc.user_id);
+                user = Some((doc.user_id, doc.name));
             }
             None => user=None,
         }
@@ -305,7 +343,7 @@ async fn get_user_of_vn(voice_collection: Collection<VoiceNote>, v_id: ObjectId)
             println!("Failed to get user: {}", e);
             user = None
         }
-    }
+    } 
 
     user
 }
@@ -443,14 +481,14 @@ async fn get_all_following(user_collection: Collection<Users> , user_id: ObjectI
             }
         }        
     }
-    println!("following {:?}", following);
+
     following
 }
 
 
 pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> , voice_collection:Collection<VoiceNote> , user_id:ObjectId) -> Vec<VoiceNote>{
     let following = get_all_following(user_collection.clone(), user_id).await;
-    println!("you follow {:?}", following);
+    println!("You follow {:?}", following);
         let mut voice_ids = Vec::new();
         for i in following {
             let filter = doc! {"_id": i};
@@ -469,6 +507,8 @@ pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> 
                 }        
             }
         }
+
+    sort_voice_notes_by_timestamp_desc(&mut voice_ids);
     for i in &voice_ids {
         download_voice_notes(voice_collection.clone(), i._id).await;
     }

@@ -1,5 +1,5 @@
-use std::{fs::{self, File}, path::Path};
-
+use std::{fs::{self, File}, path::Path, vec};
+use chrono::{DateTime, Utc, TimeZone};
 use eframe::{run_native, epi::App, egui::{self}};
 use ::egui::color::srgba;
 use crate::db_config::{self, Users};
@@ -34,6 +34,7 @@ pub struct Gui {
     voice_note_collection: Option<Collection<db_config::VoiceNote>>,
     database: Option<Database>,
     client: Option<Client>,
+    voicenote_vec: Option<Vec<db_config::VoiceNote>>,
 
     // Data for login and signup page
     username: String,
@@ -82,6 +83,7 @@ impl Gui {
             password: String::new(),
             confirm_password: String::new(),
             theme: Theme::default(),
+            voicenote_vec: None,
             user_collection: None,
             voice_note_collection: None,
             database: None,
@@ -259,6 +261,7 @@ impl Gui {
                         response
                     });
                 self.userid = response.0.clone();
+                self.voicenote_vec = Some(response.1.clone());
                 println!("login successful : {:?}",response.0.clone() );
 
                 self.current_page = Page::Home;
@@ -298,51 +301,6 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
     // Count the number of voicenotes
     let voicenote_count = count_voicenotes();
     ui.label(format!("You have {} voicenotes.", voicenote_count));
-
-    ui.add_space(10.0);
-
-    // Display voicenote posts
-    for i in 0..voicenote_count {
-        ui.collapsing(format!("Voicenote {}", i + 1), |ui| {
-            // Add content for each voicenote post here
-            ui.label("Voicenote content");
-
-            // Play single voicenote button
-            ui.horizontal(|ui| {
-                if ui.button("▶️ Play").clicked() {
-                    // Play the selected voicenote
-                    let directory = "."; // Main directory path
-                    let files = fs::read_dir(directory).unwrap();
-                    let mut filenames: Vec<String> = Vec::new(); // Vector to store filenames
-
-                    for file in files {
-                        if let Ok(file) = file {
-                            if let Some(extension) = file.path().extension() {
-                                if extension == "wav" {
-                                    let filename = file.path().to_str().unwrap().to_owned();
-                                    filenames.push(filename);
-                                }
-                            }
-                        }
-                    }
-
-                    // Play the audio file
-                    if let Some(filename) = filenames.get(i) {
-                        let x = play_audio(filename);
-                        // if ui.button("⏸️ Pause").clicked() {
-                        //     // Pause the currently playing audio
-                        //     pause_audio(&x);
-                        // }
-
-                        // if ui.button("⏹️ Stop").clicked() {
-                        //     // Stop the audio playback
-                        //     stop_audio(&x);
-                        // }
-                    }
-                }
-            });
-        });
-    }
 
     ui.add_space(10.0);
 
@@ -400,6 +358,52 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
             self.current_page = Page::Login;
         }
     });
+
+    ui.add_space(10.0);
+
+    let mut vec_vc = self.voicenote_vec.clone();
+    egui::ScrollArea::auto_sized().show(ui, |ui| {
+
+        // Display voicenote posts
+        for i in 0..voicenote_count {
+            let voice_obj = vec_vc.clone().unwrap()[i].clone();
+            ui.group(|ui| {
+                ui.label(format!("Voicenote {} by {}",i+1, voice_obj.name));
+                // Add content for each voicenote post here
+
+                // Play single voicenote button
+                ui.horizontal(|ui| {
+                    if ui.button("▶️ Play").clicked() {
+                        let filename = voice_obj._id.to_hex()+".wav";
+                        let x = play_audio(&filename);
+                    }
+                });
+
+                let time = Utc.timestamp(voice_obj.timestamp.timestamp(), 0);
+                let formatted_time = time.format("%Y-%m-%d %H:%M:%S").to_string();
+
+                ui.label(format!("Posted on: {}", formatted_time));
+
+                ui.group(|ui| {
+                    ui.horizontal(|ui| {
+                        if ui.button("Shut Up").clicked() {
+                            
+                        }
+                        if ui.button("Speak Up").clicked() {
+    
+                        }
+                        if ui.button("Conversation").clicked() {
+                        
+                        }
+                    });
+                });
+
+                
+            });
+        }
+    });
+
+    ui.add_space(10.0);
 }
 
 
@@ -693,16 +697,18 @@ fn count_voicenotes() -> usize {
 use rodio::{source::Source};
 
 // Function to play the audio and return the Sink object
-fn play_audio(filename: &str) -> Sink {
+use rodio::{Decoder};
+
+// Function to play the audio
+fn play_audio(filename: &str) {
     let (_stream, stream_handle) = OutputStream::try_default().unwrap();
     let sink = Sink::try_new(&stream_handle).unwrap();
     let file = File::open(filename).unwrap();
-    let source = rodio::Decoder::new(BufReader::new(file)).unwrap().buffered();
-    
-    sink.append(source);
-    sink.play();
+    let source = Decoder::new(BufReader::new(file)).unwrap();
 
-    sink
+    // Play the audio
+    sink.append(source);
+    sink.sleep_until_end();
 }
 
 // Function to pause the audio playback
