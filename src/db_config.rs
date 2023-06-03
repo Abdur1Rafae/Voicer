@@ -109,10 +109,10 @@ pub async fn connect_to_mongodb() -> (Collection<Users>, Collection<VoiceNote>, 
     (collection, vcollection, db , client)
 }
 
-pub async fn find_users_by_names(user_collection: Collection<Users> , name: &str, user_id: ObjectId) -> Vec<publicUser> {
-    let filter = doc! {"name": name};
+pub async fn find_users_by_names(user_collection: Collection<Users> , username: &str, user_id: ObjectId) -> ObjectId {
+    let filter = doc! {"username": username};
     let mut cursor = user_collection.find(filter, None).await.expect("Failed to execute find.");
-    let mut users = Vec::new();
+    let mut users = ObjectId::new();
     let mut var=0;
     while let Some(result) = cursor.next().await {
         if let Ok(user) = result {
@@ -128,7 +128,7 @@ pub async fn find_users_by_names(user_collection: Collection<Users> , name: &str
                     following: user.following,
                     voice_notes: user.voice_notes,
                 };
-                users.push(pub_user);
+                users=user_id;
                 var= var+1;
             }
         }

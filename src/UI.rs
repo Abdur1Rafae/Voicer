@@ -2,7 +2,7 @@ use std::{fs::{self, File}, path::Path, vec};
 use chrono::{DateTime, Utc, TimeZone};
 use eframe::{run_native, epi::App, egui::{self}};
 use ::egui::color::srgba;
-use crate::db_config::{self, Users};
+use crate::db_config::{self, Users, publicUser, get_user_by_username, find_users_by_names};
 use mongodb::{Client, Collection  , Database};
 use mongodb::bson::{self,oid::ObjectId};
 use tokio::{io, time::Instant, runtime::Runtime};
@@ -19,8 +19,8 @@ enum Page {
     Signup,
     Login,
     Home,
-    MyProfile,
-    MyPost,
+    MyTweet,
+    Follow,
     FollowerPost,
 }
 
@@ -31,6 +31,7 @@ pub struct Gui {
     // Error message to display
     error_message: Option<String>,
     user_collection: Option<Collection<db_config::Users>>,
+    userslist: ObjectId,
     voice_note_collection: Option<Collection<db_config::VoiceNote>>,
     database: Option<Database>,
     client: Option<Client>,
@@ -38,10 +39,12 @@ pub struct Gui {
 
     // Data for login and signup page
     username: String,
+    followuser: String,
     password: String,
     email: String,
     confirm_password: String,
     userid: ObjectId,
+    
 
     // Extra data
     theme: Theme,
@@ -79,6 +82,7 @@ impl Gui {
             current_page: Page::Login,
             error_message: None,
             username: String::new(),
+            followuser:String::new(),
             email: String::new(),
             password: String::new(),
             confirm_password: String::new(),
@@ -86,6 +90,7 @@ impl Gui {
             voicenote_vec: None,
             user_collection: None,
             voice_note_collection: None,
+            userslist : ObjectId::new(),
             database: None,
             client: None,
             userid: ObjectId::new(),
@@ -216,14 +221,6 @@ impl Gui {
             });
             if ui.button("Log in").clicked() 
             {
-                // Handle login button click
-                // -----------------------------------login implementation
-                // if self.username == "admin" && self.password == "password" {
-                //     self.current_page = Page::Home;
-                // } else {
-                //     // Show an error message if the login failed
-                //     self.error_message = Some("login failed. Incorrect user name and password".to_string()); // Store error message in a variable
-                // }
                 let rt= Runtime::new().unwrap();
                 let username= self.username.clone();
                 let pass= self.password.clone();
@@ -342,7 +339,11 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
 
         if ui.button("📣 Tweet").clicked() {
             // Tweet the voicenote
-            self.current_page=Page::MyProfile;                        
+            self.current_page=Page::MyTweet;                        
+        }
+        if ui.button("➹ Follow").clicked() {
+            // Follow a user
+            self.current_page=Page::Follow;                        
         }
         if ui.button("Theme").clicked() {
             // Change mode to light mode
@@ -351,6 +352,11 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
 
         if ui.button("Logout").clicked() {
             // Redirect to Login page and clear user data
+            if let Err(err) = delete_wav_files() {
+                eprintln!("Error deleting .wav files: {}", err);
+            } else {
+                println!("Successfully deleted .wav files");
+            }        
             self.username.clear();
             self.password.clear();
             self.confirm_password.clear();
@@ -409,240 +415,155 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
 
 
 
-    // Function to show the My Files page UI
-    fn my_files_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
-        // Calculate available width for each column
-        let column_width = ui.available_width();
-        ui.horizontal(|ui| {            
-            ui.heading("My Files"); // Display heading "My Files"
+fn tweet_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
+    let column_width = ui.available_width();
+    let folder_name = format!("{}", self.userid);
+    fs::create_dir_all(&folder_name).unwrap();
+    let mut file_name = ObjectId::new();
+    let directory = format!("{}/{}.wav", folder_name, file_name.to_hex());
+    let mut is_saved = false; // Flag to indicate if voicenote is successfully saved
 
-            let current_width = ui.available_width();
-            ui.add_space(600.0-(column_width-current_width)); // Add spacing between the heading and the buttons
-            if ui.button("Upload").clicked() {
-                // Handle "Upload" button click
+    ui.horizontal(|ui| {
+        ui.heading("Your voicenote can now be recorded...");
+
+        let current_width = ui.available_width();
+        ui.add_space(600.0 - (column_width - current_width));
+        
+        // Record button
+        if ui.button("Record").clicked() {
+            match ac::record(None) {
+                Ok(clip) => {
+                                // Stop button
+                    if ui.button("Stop").clicked() {
+                        println!("Stopped recording.");match clip.export(format!("{}", directory).as_str()) {
+                            Ok(_) => {
+                                println!("Successfully saved!");
+                                is_saved = true;
+                            }
+                            Err(err) => println!("Error {}", err),
+                        }}
+                        // Perform any necessary cleanup or stopping logic here
+                        // For example, you could terminate the recording process or close any open file handles.}
+                }
+                Err(err) => println!("Error {}", err),
             }
-            ui.spacing();
-            if ui.button("home").clicked() {
-                self.current_page = Page::Home;
-            }
-        });
-        ui.add_space(10.0);
+            self.current_page=Page::Home;
+        }
 
-        // Example data for the table
-        let file_names = vec![
-            "File 1", "File 2", "File 3", "File 4", "File 5",
-            "File 6", "File 7", "File 8", "File 9", "File 10",
-            "File 11", "File 12", "File 13", "File 14", "File 15",
-            "File 16", "File 17", "File 18", "File 19", "File 20",
-        ];
+        
 
-        let upload_dates = vec![
-            "2023-04-01", "2023-03-28", "2023-03-25", "2023-03-22", "2023-03-19",
-            "2023-03-16", "2023-03-13", "2023-03-10", "2023-03-07", "2023-03-04",
-            "2023-03-01", "2023-02-26", "2023-02-23", "2023-02-20", "2023-02-17",
-            "2023-02-14", "2023-02-11", "2023-02-08", "2023-02-05", "2023-02-02",
-        ];
+        // Display success message if voicenote is saved
+        if is_saved {
+            ui.label("Voicenote saved successfully!");
+        }
 
-        let file_sizes = vec![
-            "10 MB", "25 MB", "5 MB", "50 MB", "100 MB",
-            "20 MB", "15 MB", "30 MB", "40 MB", "75 MB",
-            "12 MB", "18 MB", "8 MB", "60 MB", "90 MB",
-            "22 MB", "35 MB", "45 MB", "80 MB", "70 MB",
-        ];
-    
-        // let file_members = vec![
-        //     "m.ahsan@gmail.com", "m.ahsan@gmail.com", "j.doe@gmail.com", "j.doe@gmail.com", "m.ahsan@gmail.com", "j.doe@gmail.com", "j.doe@gmail.com",
-        //     "m.ahsan@gmail.com", "j.doe@gmail.com", "j.doe@gmail.com", "m.ahsan@gmail.com", "j.doe@gmail.com", "j.doe@gmail.com", "m.ahsan@gmail.com",
-        //     "m.ahsan@gmail.com" , "j.doe@gmail.com", "j.doe@gmail.com", "m.ahsan@gmail.com", "j.doe@gmail.com", "j.doe@gmail.com", 
-        // ];
+        // Back button
+        ui.spacing();
+        if ui.button("Back").clicked() {
+            self.current_page = Page::Home;
+        }
+    });
 
-        // Begin table
-        egui::ScrollArea::auto_sized().show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label("Name"); // Column 1: Name
+    ui.add_space(10.0);
 
-                let current_width = ui.available_width();
-                ui.add_space(400.0-(column_width-current_width)); // Add spacing between columns
-
-                ui.label("Upload Date"); // Column 2: Upload Date
-
-                let current_width = ui.available_width();
-                ui.add_space(500.0-(column_width-current_width)); // Add spacing between columns
-
-                ui.label("Size"); // Column 3: Size
-
-                // let current_width = ui.available_width();
-                // ui.add_space(500.0-(column_width-current_width)); // Add spacing between columns
-
-                // ui.label("Members"); // Column 4: Members
-
-                let current_width = ui.available_width();
-                ui.add_space(600.0-(column_width-current_width)); // Add spacing between columns
-
-                ui.label("Options"); // Column 5: Options
-            });
-
-            // Display table rows
-            for i in 0..file_names.len() {
-                ui.separator();
-                ui.horizontal(|ui| {
-                    ui.label(file_names[i]); // Display file name in Column 1
-
-                    let current_width = ui.available_width();
-                    ui.add_space(400.0-(column_width-current_width)); // Add spacing between columns
-
-                    ui.label(upload_dates[i]); // Display last modified date in Column 2
-
-                    let current_width = ui.available_width();
-                    ui.add_space(500.0-(column_width-current_width)); // Add spacing between columns
-
-                    // Display file size in Column 3
-                    ui.label(file_sizes[i]); // Display "file_sizes[i]"
-
-                    // let current_width = ui.available_width();
-                    // ui.add_space(500.0-(column_width-current_width)); // Add spacing between columns
-
-                    // // Display members in Column 4
-                    // ui.label(file_members[i]); // Display "shared_with[i]"
-
-                    let current_width = ui.available_width();
-                    ui.add_space(600.0-(column_width-current_width)); // Add spacing between columns
-
-                    // Display buttons in Column 5 with updated labels
-                    if ui.button("Download").clicked() {
-                        // Handle "Download" button click
-                    }
-                    ui.spacing(); // Add spacing between buttons
-                    if ui.button("Share").clicked() {
-                        // Handle "Share" button click
-                    }
-                    ui.spacing(); // Add spacing between buttons
-                    if ui.button("Delete").clicked() {
-                        // Handle "Delete" button click
-                    }
-                });
-            }
-
-            // End table
-            ui.separator();
-        });
     }
-
     // Function to show the Shared Files page UI
-    fn shared_files_page_1(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
-        // Calculate available width for each column
-        let column_width = ui.available_width();
-        ui.horizontal(|ui| {
-            ui.heading("Shared Files"); // Display heading "Shared Files"
-            let current_width = ui.available_width();
-            ui.add_space(600.0-(column_width-current_width)); // Add spacing between header and button
-            if ui.button("home").clicked() {
-                self.current_page = Page::Home;
-            }
-        });
-        ui.add_space(10.0);        
-    
-        // Example data for the table
-        let names = vec!["Person 1", "Person 2", "Person 3"];
-        let items= vec!["1", "3", "2"];
-        let last_modified = vec!["2023-04-01", "2023-03-28", "2023-03-25"];
-    
-        // Begin table
-        egui::ScrollArea::auto_sized().show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label("Name"); // Column 1: Name
+fn FollowPage(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
+        // ui.horizontal(|ui| {
+        //     ui.heading("Follow a Voicer User"); // Display heading "Shared Files"
+        //     let current_width = ui.available_width();
+        //     if ui.button("home").clicked() {
+        //         self.current_page = Page::Home;
+        //     }
+        // let mut fuser = String::new();
+        // let mut fusernum = String::new();
 
-                let current_width = ui.available_width();
-                ui.add_space(300.0-(column_width-current_width)); // Add spacing between columns
-                ui.label("Items"); // Column 2: Items
+        //     ui.label("Username: ");
+        //     let current_width = ui.available_width();
+        //     ui.text_edit_singleline(&mut fuser);
 
-                let current_width = ui.available_width();
-                ui.add_space(600.0-(column_width-current_width)); // Add spacing between columns
-                ui.label("Last modified"); // Column 3: Last modified
-            });
-
-            // Display table rows
-            for i in 0..names.len() {
-                ui.separator();
-                ui.horizontal(|ui| {
-                    // ui.add_space(column_width); // Add empty space for first column
-                    if ui.button(format!("{}",names[i])).clicked() {
-                        //self.current_page = Page::SharedFiles2;
-                    } // Display file name in Column 1
-
-                    let current_width = ui.available_width();
-                    ui.add_space(300.0-(column_width-current_width)); // Add spacing between columns
-                    ui.label(items[i]); // Display shared by in Column 2
-
-                    let current_width = ui.available_width();
-                    ui.add_space(600.0-(column_width-current_width)); // Add spacing between columns
-                    ui.label(last_modified[i]); // Display last modified date in Column 3
-                });
-            }
-        });
-    }
-        // Function to show the Shared Files page UI
-        fn shared_files_page_2(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
+        // if ui.button("Follow").clicked() {
+        //         // getuserlist(fuser.clone(), self.userid);
+        //         // println!("Enter the ref number of the user you would like to follow:");
+        //         // ui.text_edit_singleline(&mut fusernum);
+        //         // follow_user(self.userid, fuser.clone());
+                                        
+                
+        //   }
+        let mut userlist: Vec<publicUser> = Vec::new();
+        ui.heading("Follow a Voicer User");
+        ui.add_space(10.0);
+        // Group the contents of the login page
+        ui.group(|ui| {
             // Calculate available width for each column
             let column_width = ui.available_width();
             ui.horizontal(|ui| {
-                ui.heading("Shared Files with person x"); // Display heading "Shared Files"
+                ui.label("Enter Username: ");
                 let current_width = ui.available_width();
-                ui.add_space(600.0-(column_width-current_width)); // Add spacing between header and button
-                if ui.button("back").clicked() {
-                    //self.current_page = Page::SharedFiles;
-                }
-                if ui.button("home").clicked() {
-                    self.current_page = Page::Home;
-                }
+                ui.add_space(70.0-(column_width-current_width)); // Add spacing between the label and the text edit
+                ui.text_edit_singleline(&mut self.followuser);
             });
-            ui.add_space(10.0);        
+            if ui.button("Search").clicked() 
+            {   
+                let user2=self.followuser.clone();
+                let userid2= self.userid.clone();
+                let rt= Runtime::new().unwrap();
+                    let (userlistr) = rt.block_on( async move
+                        {
+                            let response = tokio::spawn
+                            ( async move
+                                {
+                                    let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                    let userlistr=find_users_by_names(user_collection, & user2, userid2).await;
+                                    userlistr
+                                }
+                            ).await.unwrap();
+                            response
+                        });
+
+                self.userslist=userlistr;
+                self.current_page=Page::FollowerPost;
+                         
+               
+            }
+
+        });
+    
+        ui.add_space(10.0);
         
-            // Example data for the table
-            let file_names = vec!["File 1", "File 2", "File 3"];
-            // let shared_by = vec!["m.ahsan@gmail", "maaz.shamim@hotmail", "maaz.batla@outlook"];
-        
-            // Begin table
-            egui::ScrollArea::auto_sized().show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label("Name"); // Column 1: Name
-    
-                    // let current_width = ui.available_width();
-                    // ui.add_space(300.0-(column_width-current_width)); // Add spacing between columns
-                    // ui.label("Shared by"); // Column 2: Shared by
-    
-                    let current_width = ui.available_width();
-                    ui.add_space(600.0-(column_width-current_width)); // Add spacing between columns
-                    ui.label("Options"); // Column 3: Options
-                });
-    
-                // Display table rows
-                for i in 0..file_names.len() {
-                    ui.separator();
-                    ui.horizontal(|ui| {
-                        // ui.add_space(column_width); // Add empty space for first column
-                        ui.label(file_names[i]); // Display file name in Column 1
-    
-                        // let current_width = ui.available_width();
-                        // ui.add_space(300.0-(column_width-current_width)); // Add spacing between columns
-                        // ui.label(shared_by[i]); // Display shared by in Column 2
-    
-                        let current_width = ui.available_width();
-                        ui.add_space(600.0-(column_width-current_width)); // Add spacing between columns
-    
-                        if ui.button("Download").clicked() { // Display buttons in Column 3
-                            // Handle "Download" button click
-                        }
-                        ui.spacing(); // Add spacing between buttons
-                        if ui.button("Share").clicked() {
-                            // Handle "Share" button click
-                        }
-                    });
-                }
-            });
+    }
+        // Function to show the Shared Files page UI
+    fn shared_files_page_2(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
+
+            ui.label(format!("User ID: {}", self.userslist));
+            
+            if ui.button("Follow").clicked() {
+                let mut myuser=self.userid;
+                let mut myfol=self.userslist;
+                let rt= Runtime::new().unwrap();
+                    let (userlistr) = rt.block_on( async move
+                        {
+                            let response = tokio::spawn
+                            ( async move
+                                {
+                                    let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                    db_config::follow(user_collection.clone(), myuser, myfol).await;
+
+                                }
+                            ).await.unwrap();
+                            response
+                        });
+                ui.label(format!("Successfull"));
+                self.current_page=Page::Home;
+            }
+            if ui.button("Back").clicked() {
+                self.current_page = Page::Home;
+            }
+                
+            }
         }
     
-}
+
 
 impl App for Gui {
     fn update(&mut self, ctx: &egui::CtxRef, _frame: &mut eframe::epi::Frame<'_>) {
@@ -657,11 +578,11 @@ impl App for Gui {
                 Page::Home => {
                     self.home_page(ctx, ui);
                 }
-                Page::MyProfile => {
-                    self.my_files_page(ctx, ui);
+                Page::MyTweet => {
+                    self.tweet_page(ctx, ui);
                 }
-                Page::MyPost => {
-                    self.shared_files_page_1(ctx, ui);
+                Page::Follow => {
+                    self.FollowPage(ctx, ui);
                 },
                 Page::FollowerPost => {
                     self.shared_files_page_2(ctx, ui);
@@ -724,3 +645,27 @@ fn stop_audio(sink: &Sink) {
 async fn save_audio() {
 
 }
+
+
+fn delete_wav_files() -> io::Result<()> {
+    // Get the current directory
+    let current_dir = std::env::current_dir()?;
+
+    // Read the directory entries
+    let entries = fs::read_dir(current_dir)?;
+
+    for entry in entries {
+        if let Ok(entry) = entry {
+            let file_path = entry.path();
+            if let Some(extension) = file_path.extension() {
+                if extension == "wav" {
+                    // Delete the file
+                    fs::remove_file(file_path)?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
