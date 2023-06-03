@@ -99,6 +99,7 @@ impl Gui {
 
     // Function to show the signup page UI
     fn signup_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
+        let mut password_visible = true;
         ui.heading("Sign up");
         ui.add_space(10.0);
         // Group the contents of the signup page
@@ -121,14 +122,18 @@ impl Gui {
                 ui.label("Password: ");
                 let current_width = ui.available_width();
                 ui.add_space(110.0-(column_width-current_width)); // Add spacing between the heading and the buttons
-                ui.text_edit_singleline(&mut self.password);
+                ui.add(egui::TextEdit::singleline(&mut self.password).password(password_visible));
+                //ui.text_edit_singleline(&mut self.password);
+                         
+
             });
             ui.horizontal(|ui| {
                 ui.label("Confirm Password: ");
                 let current_width = ui.available_width();
                 ui.add_space(110.0-(column_width-current_width)); // Add spacing between the heading and the buttons
-                ui.text_edit_singleline(&mut self.confirm_password);
+                ui.add(egui::TextEdit::singleline(&mut self.confirm_password).password(password_visible));
             });
+            ui.add(egui::Checkbox::new(&mut password_visible, "Show Password"));
             if ui.button("Sign up").clicked() {
                 
                 // Handle signup button click
@@ -217,7 +222,8 @@ impl Gui {
                 ui.label("Password: ");
                 let current_width = ui.available_width();
                 ui.add_space(70.0-(column_width-current_width)); // Add spacing between the label and the text edit
-                ui.text_edit_singleline(&mut self.password);
+                ui.add(egui::TextEdit::singleline(&mut self.password).password(true));
+                //ui.text_edit_singleline(&mut self.password);
             });
             if ui.button("Log in").clicked() 
             {
