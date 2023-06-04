@@ -24,6 +24,7 @@ enum Page {
     FollowerPost,
 }
 
+
 pub struct Gui {
     // Current page of the application
     current_page: Page,
@@ -58,7 +59,7 @@ enum Theme {
 
 impl Default for Theme {
     fn default() -> Self {
-        Theme::Dark // Set the default theme/mode to dark
+        Theme::Light // Set the default theme/mode to dark
     }
 }
 
@@ -100,8 +101,13 @@ impl Gui {
     // Function to show the signup page UI
     fn signup_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
         let mut password_visible = true;
-        ui.heading("Sign up");
-        ui.add_space(10.0);
+        ui.vertical_centered(|ui|{
+            ui.heading("Sign up");
+            ui.add_space(10.0);
+    
+        });
+        ui.vertical(|ui|{
+
         // Group the contents of the signup page
         ui.group(|ui| {
             // Calculate available width for each column
@@ -119,7 +125,7 @@ impl Gui {
                 ui.text_edit_singleline(&mut self.email);
             });
             ui.horizontal(|ui| {
-                ui.label("Password: ");
+                ui.label("Password:  ");
                 let current_width = ui.available_width();
                 ui.add_space(110.0-(column_width-current_width)); // Add spacing between the heading and the buttons
                 ui.add(egui::TextEdit::singleline(&mut self.password).password(password_visible));
@@ -134,6 +140,8 @@ impl Gui {
                 ui.add(egui::TextEdit::singleline(&mut self.confirm_password).password(password_visible));
             });
             ui.add(egui::Checkbox::new(&mut password_visible, "Show Password"));
+
+            ui.add_space(5.0);
             if ui.button("Sign up").clicked() {
                 
                 // Handle signup button click
@@ -199,34 +207,52 @@ impl Gui {
                     self.current_page = Page::Login;
                 }
             });
-        });
+        });});
     }
 
 
 
     // Function to show the login page UI
     fn login_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
-        ui.heading("Login");
-        ui.add_space(10.0);
+        ui.vertical_centered(|ui|{
+            ui.add_space(10.0);
+            ui.heading("Login");
+            ui.add_space(10.0);
+            
+
+        });
+        
+        ui.add(egui::Label::new("Log in to your Voicer account"));
         // Group the contents of the login page
-        ui.group(|ui| {
-            // Calculate available width for each column
-            let column_width = ui.available_width();
-            ui.horizontal(|ui| {
-                ui.label("Username: ");
-                let current_width = ui.available_width();
-                ui.add_space(70.0-(column_width-current_width)); // Add spacing between the label and the text edit
-                ui.text_edit_singleline(&mut self.username);
+        ui.vertical_centered(|ui| {
+            ui.group(|ui| {
+
+                ui.style_mut().wrap = Some(true);
+                let column_width = ui.available_width();
+                ui.horizontal(|ui| {
+                    ui.label("Username :");
+                    let current_width = ui.available_width();
+                    ui.add_space(110.0-(column_width-current_width)); // Add spacing between the heading and the buttons    
+                    ui.text_edit_singleline(&mut self.username);
+                });
+    
+                ui.horizontal(|ui| {
+                    ui.label("Password :  ");
+                    let current_width = ui.available_width();
+                    ui.add_space(110.0-(column_width-current_width)); // Add spacing between the heading and the buttons    
+                    ui.add(egui::TextEdit::singleline(&mut self.password).password(true));
+                });
             });
-            ui.horizontal(|ui| {
-                ui.label("Password: ");
-                let current_width = ui.available_width();
-                ui.add_space(70.0-(column_width-current_width)); // Add spacing between the label and the text edit
-                ui.add(egui::TextEdit::singleline(&mut self.password).password(true));
-                //ui.text_edit_singleline(&mut self.password);
-            });
-            if ui.button("Log in").clicked() 
-            {
+        });
+
+        ui.vertical(|ui|{
+            ui.add_space(5.0);
+
+
+        });
+        ui.horizontal(|ui| {
+                if ui.button("Log in").clicked() {
+ 
                 let rt= Runtime::new().unwrap();
                 let username= self.username.clone();
                 let pass= self.password.clone();
@@ -268,13 +294,19 @@ impl Gui {
                 println!("login successful : {:?}",response.0.clone() );
 
                 self.current_page = Page::Home;
-                
-            }
+                }
+                });
+
                 if let Some(error_message) = &self.error_message {
                     // Display error message if it exists
                     ui.add(egui::Label::new(error_message).text_color(egui::Color32::RED));
                 }
-                ui.horizontal(|ui| {
+            ui.vertical(|ui|{
+                    ui.add_space(10.0);
+        
+        
+                });
+            ui.horizontal(|ui| {
                     ui.label("Don't have an account?");
                     if ui.button("Sign up").clicked() {
                         // Show the signup page if the user clicks the sign up button
@@ -284,8 +316,8 @@ impl Gui {
                         self.current_page = Page::Signup;
                     }
                 });
-            });
-    }
+            
+    ;}
 
     
 
