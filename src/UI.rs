@@ -309,7 +309,6 @@ impl Gui {
             ui.horizontal(|ui| {
                     ui.label("Don't have an account?");
                     if ui.button("Sign up").clicked() {
-                        // Show the signup page if the user clicks the sign up button
                         self.error_message = None;
                         self.username.clear();
                         self.password.clear();
@@ -359,19 +358,7 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
 
             // Play the audio files
             for filename in filenames {
-            play_audio(&filename);
-
-                // ui.horizontal(|ui| {
-                //     if ui.button("⏸️ Pause").clicked() {
-                //         // Pause the currently playing audio
-                //         pause_audio(&x);
-                //     }
-
-                //     if ui.button("⏹️ Stop").clicked() {
-                //         // Stop the audio playback
-                //         stop_audio(&x);
-                //     }
-                // });
+                play_audio(&filename);
             }
         }
 
@@ -463,71 +450,58 @@ fn tweet_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
 
     ui.horizontal(|ui| {
         ui.heading("Your voicenote can now be recorded...");
-
-        let current_width = ui.available_width();
-        ui.add_space(600.0 - (column_width - current_width));
-        
-        // Record button
-        if ui.button("Record").clicked() {
-            match ac::record(None) {
-                Ok(clip) => {
-                                // Stop button
-                    if ui.button("Stop").clicked() {
-                        println!("Stopped recording.");match clip.export(format!("{}", directory).as_str()) {
-                            Ok(_) => {
-                                println!("Successfully saved!");
-                                is_saved = true;
-                            }
-                            Err(err) => println!("Error {}", err),
-                        }}
-                        // Perform any necessary cleanup or stopping logic here
-                        // For example, you could terminate the recording process or close any open file handles.}
-                }
-                Err(err) => println!("Error {}", err),
-            }
-            self.current_page=Page::Home;
-        }
-
-        
-
-        // Display success message if voicenote is saved
-        if is_saved {
-            ui.label("Voicenote saved successfully!");
-        }
-
-        // Back button
-        ui.spacing();
-        if ui.button("Back").clicked() {
-            self.current_page = Page::Home;
-        }
     });
+    
+    // Record button
+    if ui.button("Record").clicked() {
+        match ac::record(None) {
+            Ok(clip) => {
+                match clip.export(format!("{}" , directory).as_str()) {
+                    Ok(_) => {
+                        println!("Successfully saved!");
+                    }
+                    Err(err) => println!("Error {}", err),
+                }
+            }
+            Err(err) => println!("Error {}", err),
+        }
+        let userid = self.userid;
+        let rt= Runtime::new().unwrap();
+        let response = rt.block_on( async move
+            {
+                let response = tokio::spawn
+                ( async move
+                    {
+                        let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                        println!("{userid}");
+                        let data = db_config::convert_audio_to_vec(&directory).await;
+                        db_config::create_post(voice_note_collection,user_collection, userid, data, file_name).await;
+                        match fs::remove_dir_all(&(Path::new(&folder_name))) {
+                            Ok(_) => println!("Directory deleted successfully"),
+                            Err(err) => println!("Error deleting directory: {}", err),
+                        }
+                        is_saved = true;
+                    }
+                ).await.unwrap();
+                response
+            });        
+    }
+    if is_saved {
+        ui.label("Voicenote saved successfully!");
+    }
+
+    // Display success message if voicenote is saved
+
+    if ui.button("Back").clicked() {
+        self.current_page = Page::Home;
+    }
+
 
     ui.add_space(10.0);
 
     }
     // Function to show the Shared Files page UI
 fn FollowPage(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
-        // ui.horizontal(|ui| {
-        //     ui.heading("Follow a Voicer User"); // Display heading "Shared Files"
-        //     let current_width = ui.available_width();
-        //     if ui.button("home").clicked() {
-        //         self.current_page = Page::Home;
-        //     }
-        // let mut fuser = String::new();
-        // let mut fusernum = String::new();
-
-        //     ui.label("Username: ");
-        //     let current_width = ui.available_width();
-        //     ui.text_edit_singleline(&mut fuser);
-
-        // if ui.button("Follow").clicked() {
-        //         // getuserlist(fuser.clone(), self.userid);
-        //         // println!("Enter the ref number of the user you would like to follow:");
-        //         // ui.text_edit_singleline(&mut fusernum);
-        //         // follow_user(self.userid, fuser.clone());
-                                        
-                
-        //   }
         let mut userlist: Vec<publicUser> = Vec::new();
         ui.heading("Follow a Voicer User");
         ui.add_space(10.0);
@@ -538,7 +512,7 @@ fn FollowPage(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
             ui.horizontal(|ui| {
                 ui.label("Enter Username: ");
                 let current_width = ui.available_width();
-                ui.add_space(70.0-(column_width-current_width)); // Add spacing between the label and the text edit
+                ui.add_space(100.0-(column_width-current_width)); // Add spacing between the label and the text edit
                 ui.text_edit_singleline(&mut self.followuser);
             });
             if ui.button("Search").clicked() 

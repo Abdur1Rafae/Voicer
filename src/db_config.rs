@@ -123,12 +123,11 @@ pub async fn find_users_by_names(user_collection: Collection<Users> , username: 
                     username: user.username,
                     name: user.name,
                     description: user.description,
-                    // verified: user.verified,
                     followers: user.followers,
                     following: user.following,
                     voice_notes: user.voice_notes,
                 };
-                users=user_id;
+                users=user._id;
                 var= var+1;
             }
         }
