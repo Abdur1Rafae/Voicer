@@ -26,14 +26,6 @@ impl Users {
         let new_user = self.clone();
         collection.insert_one(new_user, None).await.unwrap();
     }
-
-    // pub fn new(name: &str, age: u8, email: &str) -> Self {
-    //     Self {
-    //         name: name.to_string(),
-    //         age,
-    //         email: email.to_string(),
-    //     }
-    // }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -81,18 +73,13 @@ impl VoiceNote{
     }
 }
 
-
-// impl Ord for VoiceNote {
-//     fn cmp(&self, other: &Self) -> Ordering {
-//         self.timestamp.cmp(&other.timestamp)
-//     }
-// }
-
+#[derive(Clone)]
 pub struct replies{
     pub _id: ObjectId,
     pub user_id: (ObjectId, String),
 }
 
+#[derive(Clone)]
 pub struct conversation{
     pub v_id: ObjectId,
     pub v_user_id: ObjectId,

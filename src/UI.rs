@@ -22,32 +22,23 @@ enum Page {
     MyTweet,
     Follow,
     FollowerPost,
+    Conversation
 }
 
 
 pub struct Gui {
     // Current page of the application
     current_page: Page,
-
-    // Error message to display
     error_message: Option<String>,
-    user_collection: Option<Collection<db_config::Users>>,
     userslist: ObjectId,
-    voice_note_collection: Option<Collection<db_config::VoiceNote>>,
-    database: Option<Database>,
-    client: Option<Client>,
     voicenote_vec: Option<Vec<db_config::VoiceNote>>,
-
-    // Data for login and signup page
     username: String,
     followuser: String,
     password: String,
     email: String,
     confirm_password: String,
     userid: ObjectId,
-    
-
-    // Extra data
+    conversation: Option<db_config::conversation>,
     theme: Theme,
 }
 
@@ -89,12 +80,9 @@ impl Gui {
             confirm_password: String::new(),
             theme: Theme::default(),
             voicenote_vec: None,
-            user_collection: None,
-            voice_note_collection: None,
             userslist : ObjectId::new(),
-            database: None,
-            client: None,
             userid: ObjectId::new(),
+            conversation: None,
         }
     }
 
@@ -168,12 +156,8 @@ impl Gui {
                             ).await.unwrap();
                             response
                         });
-                    self.user_collection = Some(usercol.clone());
-                    self.voice_note_collection = Some(voicecol.clone());
-                    self.database = Some(database.clone());
-                    self.client = Some(client.clone());
 
-                    let another_uc = self.user_collection.clone().unwrap();
+                    let another_uc = usercol.clone();
 
                     let response = rt.block_on( async move
                         {
@@ -256,39 +240,22 @@ impl Gui {
                 let rt= Runtime::new().unwrap();
                 let username= self.username.clone();
                 let pass= self.password.clone();
-                let (usercol, voicecol, database, client) = rt.block_on( async move
+                let (response) = rt.block_on( async move
                     {
                         let response = tokio::spawn
                         ( async move
                             {
                                 let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                (user_collection, voice_note_collection, db, client)
-                            }
-                        ).await.unwrap();
-                        response
-                    });
-                self.user_collection = Some(usercol.clone());
-                self.voice_note_collection = Some(voicecol.clone());
-                self.database = Some(database.clone());
-                self.client = Some(client.clone());
-
-                let another_uc = usercol.clone();
-                let vc = voicecol.clone();
-
-                let response = rt.block_on( async move
-                    {
-                        let response = tokio::spawn
-                        ( async move
-                            {
-                                let response = db_config::get_user_by_username(another_uc.clone(), username, pass).await;
+                                let response = db_config::get_user_by_username(user_collection.clone(), username, pass).await;
                                 let user_iddd= response.unwrap()._id.clone();
-                                let response2 = db_config::get_all_voice_ids_from_following(another_uc ,vc , user_iddd).await;
+                                let response2 = db_config::get_all_voice_ids_from_following(user_collection ,voice_note_collection , user_iddd).await;
         
                                 (user_iddd,response2)
                             }
                         ).await.unwrap();
                         response
                     });
+
                 self.userid = response.0.clone();
                 self.voicenote_vec = Some(response.1.clone());
                 println!("login successful : {:?}",response.0.clone() );
@@ -324,8 +291,6 @@ impl Gui {
 
 // Function to show the home page UI
 fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
-    
-
     let folder_name = format!("{}", self.userid);
     fs::create_dir_all(&folder_name).unwrap(); 
     ui.heading("Voicer Home Page");
@@ -394,15 +359,14 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
 
     let mut vec_vc = self.voicenote_vec.clone();
     egui::ScrollArea::auto_sized().show(ui, |ui| {
-
+        let userid = self.userid.clone();
+        let voice = vec_vc.unwrap();
         // Display voicenote posts
         for i in 0..voicenote_count {
-            let voice_obj = vec_vc.clone().unwrap()[i].clone();
+            let voice_obj = voice[i].clone();
             ui.group(|ui| {
                 ui.label(format!("Voicenote {} by {}",i+1, voice_obj.name));
-                // Add content for each voicenote post here
 
-                // Play single voicenote button
                 ui.horizontal(|ui| {
                     if ui.button("▶️ Play").clicked() {
                         let filename = voice_obj._id.to_hex()+".wav";
@@ -414,17 +378,58 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
                 let formatted_time = time.format("%Y-%m-%d %H:%M:%S").to_string();
 
                 ui.label(format!("Posted on: {}", formatted_time));
-
+                let mut reaction = db_config::ReactionType::SpeakUp;
                 ui.group(|ui| {
                     ui.horizontal(|ui| {
                         if ui.button("Shut Up").clicked() {
-                            
+                            reaction = db_config::ReactionType::ShutUp;
+                            let rt= Runtime::new().unwrap();
+                            let (response) = rt.block_on( async move
+                                {
+                                    let response = tokio::spawn
+                                    ( async move
+                                        {
+                                            let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                            db_config::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
+                                        }
+                                    ).await.unwrap();
+                                    response
+                                }
+                            );
                         }
                         if ui.button("Speak Up").clicked() {
-    
+                            reaction = db_config::ReactionType::SpeakUp;
+                            let rt= Runtime::new().unwrap();
+                            let (response) = rt.block_on( async move
+                                {
+                                    let response = tokio::spawn
+                                    ( async move
+                                        {
+                                            let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                            db_config::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
+                                        }
+                                    ).await.unwrap();
+                                    response
+                                }
+                            );
                         }
                         if ui.button("Conversation").clicked() {
-                        
+                            let rt= Runtime::new().unwrap();
+                            let (response) = rt.block_on( async move
+                                {
+                                    let response = tokio::spawn
+                                    ( async move
+                                        {
+                                            let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                            let replies = db_config::create_conversation(voice_note_collection, voice_obj._id).await;
+                    
+                                            (replies)
+                                        }
+                                    ).await.unwrap();
+                                    response
+                                });
+                            self.conversation = Some(response);
+                            self.current_page= Page::Conversation;
                         }
                     });
                 });
@@ -437,8 +442,119 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
     ui.add_space(10.0);
 }
 
+fn conversation(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui){
+    ui.heading("Conversation");
+    ui.add_space(10.0);
+    let folder_name = format!("{}", self.userid);
+    fs::create_dir_all(&folder_name).unwrap();
+    let mut file_name = ObjectId::new();
+    let directory = format!("{}/{}.wav", folder_name, file_name.to_hex());
+    let mut reply = self.conversation.clone().unwrap();
+    let userid = self.userid.clone();
+    
+    if ui.button("Back").clicked() {
+        self.current_page = Page::Home;
+    }
 
+    ui.add_space(10.0);
 
+    if ui.button("Add reply").clicked() {
+        match ac::record(None) {
+            Ok(clip) => {
+                match clip.export(format!("{}" , directory).as_str()) {
+                    Ok(_) => {
+                        println!("Successfully saved!");
+                    }
+                    Err(err) => println!("Error {}", err),
+                }
+            }
+            Err(err) => println!("Error {}", err),
+        }
+        let rt= Runtime::new().unwrap();
+        let response = rt.block_on( async move
+            {
+                let response = tokio::spawn
+                ( async move
+                    {
+                        let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                        let data = db_config::convert_audio_to_vec(&directory).await;
+                        db_config::create_comment(voice_note_collection.clone(),user_collection, userid, reply.v_id.to_hex() , file_name, data).await;
+                        match fs::remove_dir_all(&(Path::new(&folder_name))) {
+                            Ok(_) => println!("Directory deleted successfully"),
+                            Err(err) => println!("Error deleting directory: {}", err),
+                        }
+                        let replies = db_config::create_conversation(voice_note_collection, reply.v_id).await;
+                
+                        (replies)
+                    }
+                ).await.unwrap();
+                response
+            });
+        self.conversation = Some(response);
+        self.current_page= Page::Conversation;   
+    }
+
+    let mut reply_count = reply.replies.len();
+
+    egui::ScrollArea::auto_sized().show(ui, |ui| {
+    let voice_obj = reply.clone().replies;
+    // Display voicenote posts
+    for i in 0..reply_count {
+        let voice = voice_obj[i].clone();
+        ui.group(|ui| {
+            ui.label(format!("Reply {} by {}",i+1, voice.user_id.1));
+            // Add content for each voicenote post here
+
+            // Play single voicenote button
+            ui.horizontal(|ui| {
+                if ui.button("▶️ Play").clicked() {
+                    let filename = voice._id.to_hex()+".wav";
+                    let x = play_audio(&filename);
+                }
+            });
+
+            let mut reaction = db_config::ReactionType::SpeakUp;
+            ui.group(|ui| {
+                ui.horizontal(|ui| {
+                    if ui.button("Shut Up").clicked() {
+                        reaction = db_config::ReactionType::ShutUp;
+                        let rt= Runtime::new().unwrap();
+                        let (response) = rt.block_on( async move
+                            {
+                                let response = tokio::spawn
+                                ( async move
+                                    {
+                                        let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                        db_config::react_to_quote(voice_note_collection, voice._id,userid,reaction.clone()).await;
+                                    }
+                                ).await.unwrap();
+                                response
+                            }
+                        );
+                    }
+                    if ui.button("Speak Up").clicked() {
+                        reaction = db_config::ReactionType::SpeakUp;
+                        let rt= Runtime::new().unwrap();
+                        let (response) = rt.block_on( async move
+                            {
+                                let response = tokio::spawn
+                                ( async move
+                                    {
+                                        let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                        db_config::react_to_quote(voice_note_collection, voice._id,userid,reaction.clone()).await;
+                                    }
+                                ).await.unwrap();
+                                response
+                            }
+                        );
+                    }
+                });
+            });
+
+            
+        });
+    }})
+}
 
 fn tweet_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
     let column_width = ui.available_width();
@@ -545,35 +661,35 @@ fn FollowPage(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
         
     }
         // Function to show the Shared Files page UI
-    fn shared_files_page_2(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
+    fn follow_user_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
 
-            ui.label(format!("User ID: {}", self.userslist));
-            
-            if ui.button("Follow").clicked() {
-                let mut myuser=self.userid;
-                let mut myfol=self.userslist;
-                let rt= Runtime::new().unwrap();
-                    let (userlistr) = rt.block_on( async move
-                        {
-                            let response = tokio::spawn
-                            ( async move
-                                {
-                                    let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                    db_config::follow(user_collection.clone(), myuser, myfol).await;
+        ui.label(format!("User ID: {}", self.userslist));
+        
+        if ui.button("Follow").clicked() {
+            let mut myuser=self.userid;
+            let mut myfol=self.userslist;
+            let rt= Runtime::new().unwrap();
+                let (userlistr) = rt.block_on( async move
+                    {
+                        let response = tokio::spawn
+                        ( async move
+                            {
+                                let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                db_config::follow(user_collection.clone(), myuser, myfol).await;
 
-                                }
-                            ).await.unwrap();
-                            response
-                        });
-                ui.label(format!("Successfull"));
-                self.current_page=Page::Home;
-            }
-            if ui.button("Back").clicked() {
-                self.current_page = Page::Home;
-            }
-                
-            }
+                            }
+                        ).await.unwrap();
+                        response
+                    });
+            ui.label(format!("Successfull"));
+            self.current_page=Page::Home;
         }
+        if ui.button("Back").clicked() {
+            self.current_page = Page::Home;
+        }
+            
+        }
+    }
     
 
 
@@ -597,7 +713,10 @@ impl App for Gui {
                     self.FollowPage(ctx, ui);
                 },
                 Page::FollowerPost => {
-                    self.shared_files_page_2(ctx, ui);
+                    self.follow_user_page(ctx, ui);
+                }
+                Page::Conversation => {
+                    self.conversation(ctx, ui);
                 }
             }
         });
