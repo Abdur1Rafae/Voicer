@@ -482,11 +482,13 @@ pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> 
             while let Some(result) = cursor.next().await {
                 if let Ok(user) = result {
                     for k in user.voice_notes {
-                        let filter = doc! {"_id": k};
+                        let filter = doc! {"_id": k, "is_post" : true};
                         let mut cursor = voice_collection.find(filter, None).await.expect("Failed to execute find.");            
                         while let Some(result) = cursor.next().await {
                             if let Ok(voice) = result {
-                                voice_ids.push(voice);
+                                if(voice.is_post == true) {
+                                    voice_ids.push(voice);
+                                }
                             }
                         }
                     }
@@ -504,18 +506,18 @@ pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> 
 pub fn sort_voice_notes_by_timestamp_desc(notes : &mut Vec<VoiceNote>) {
     
     notes.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-
-    // notes.sort();
-    // notes.reverse();
-    // println!("{:?}",notes);
 }
 
 pub async fn download_voice_notes(voice_collection : Collection<VoiceNote> , v_id : ObjectId){
     let filter = doc! {"_id": v_id.clone()};
     let result = voice_collection.find_one(filter, None).await;
     let mut voice:Vec<i16> = Vec::new();
+    // let mut post = true;
     voice = match result.expect("Error finding voice") {
         Some(result) => { 
+            // if result.is_post == false {
+            //     post = false;
+            // }
             result.data
         },
         None => {
@@ -525,7 +527,14 @@ pub async fn download_voice_notes(voice_collection : Collection<VoiceNote> , v_i
         }
     };
 
-    let mut filename = v_id.to_string() + ".wav";
+    let mut filename =String::new();
+    // let mut reply_folder = String::from("reply/");
+    // if post == false {
+    //     filename =  String::from(reply_folder+&(v_id.to_hex() + ".wav"));
+    // }
+    // else{
+    //     filename =  v_id.to_string() + ".wav";
+    // }
 
     convert_vec_to_audio(&filename , voice).await;   
 }
