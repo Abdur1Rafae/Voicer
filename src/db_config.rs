@@ -168,7 +168,9 @@ pub async fn react_to_quote(voice_collection: Collection<VoiceNote>, v_id: Objec
     let reaction_doc = bson::to_document(&user_reaction)
     .expect("Failed to serialize reaction");
 
-    let update = doc! { "$push": { "reactions": reaction_doc} };
+    let update = doc! {
+        "$addToSet": { "reactions": reaction_doc }
+    };
 
     let options = UpdateOptions::builder().build();
 
