@@ -514,12 +514,12 @@ pub async fn download_voice_notes(voice_collection : Collection<VoiceNote> , v_i
     let filter = doc! {"_id": v_id.clone()};
     let result = voice_collection.find_one(filter, None).await;
     let mut voice:Vec<i16> = Vec::new();
-    // let mut post = true;
+    let mut post = true;
     voice = match result.expect("Error finding voice") {
         Some(result) => { 
-            // if result.is_post == false {
-            //     post = false;
-            // }
+            if result.is_post == false {
+                post = false;
+            }
             result.data
         },
         None => {
@@ -529,14 +529,7 @@ pub async fn download_voice_notes(voice_collection : Collection<VoiceNote> , v_i
         }
     };
 
-    let mut filename =String::new();
-    // let mut reply_folder = String::from("reply/");
-    // if post == false {
-    //     filename =  String::from(reply_folder+&(v_id.to_hex() + ".wav"));
-    // }
-    // else{
-    //     filename =  v_id.to_string() + ".wav";
-    // }
+    let mut filename =  v_id.to_string() + ".wav";
 
     convert_vec_to_audio(&filename , voice).await;   
 }

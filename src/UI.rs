@@ -27,7 +27,6 @@ enum Page {
 
 
 pub struct Gui {
-    // Current page of the application
     current_page: Page,
     error_message: Option<String>,
     userslist: ObjectId,
@@ -36,7 +35,6 @@ pub struct Gui {
     followuser: String,
     password: String,
     email: String,
-    confirm_password: String,
     userid: ObjectId,
     conversation: Option<db_config::conversation>,
     theme: Theme,
@@ -77,7 +75,6 @@ impl Gui {
             followuser:String::new(),
             email: String::new(),
             password: String::new(),
-            confirm_password: String::new(),
             theme: Theme::default(),
             voicenote_vec: None,
             userslist : ObjectId::new(),
@@ -115,17 +112,18 @@ impl Gui {
             ui.horizontal(|ui| {
                 ui.label("Password:  ");
                 let current_width = ui.available_width();
-                ui.add_space(110.0-(column_width-current_width)); // Add spacing between the heading and the buttons
+                ui.add_space(110.0-(column_width-current_width));
                 ui.add(egui::TextEdit::singleline(&mut self.password).password(password_visible));
                 //ui.text_edit_singleline(&mut self.password);
                          
 
             });
+            let mut confirm_pass = String::new();
             ui.horizontal(|ui| {
                 ui.label("Confirm Password: ");
                 let current_width = ui.available_width();
-                ui.add_space(110.0-(column_width-current_width)); // Add spacing between the heading and the buttons
-                ui.add(egui::TextEdit::singleline(&mut self.confirm_password).password(password_visible));
+                ui.add_space(110.0-(column_width-current_width));
+                ui.add(egui::TextEdit::singleline(&mut confirm_pass).password(password_visible));
             });
             ui.add(egui::Checkbox::new(&mut password_visible, "Show Password"));
 
@@ -133,7 +131,7 @@ impl Gui {
             if ui.button("Sign up").clicked() {
                 
                 // Handle signup button click
-                if self.password != self.confirm_password {
+                if self.password != confirm_pass {
                     // Show an error message if the passwords don't match
                     self.error_message = Some("Passwords don't match".to_string()); // Store error message in a variable
                 } else if self.username.is_empty() || self.password.is_empty() || self.email.is_empty() {
@@ -186,7 +184,6 @@ impl Gui {
                     // Show the login page if the user clicks the login button
                     self.username.clear();
                     self.password.clear();
-                    self.confirm_password.clear();
                     self.error_message = None;
                     self.current_page = Page::Login;
                 }
@@ -280,6 +277,12 @@ impl Gui {
                         self.username.clear();
                         self.password.clear();
                         self.current_page = Page::Signup;
+                        self.userslist= ObjectId::new();
+                        self.voicenote_vec= None;
+                        self.followuser.clear();
+                        self.email.clear();
+                        self.userid= ObjectId::new();
+                        self.conversation= None; 
                     }
                 });
             
@@ -298,7 +301,7 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
     ui.label(format!("Welcome, {}!", self.username)); // Display welcome message with user's name
 
     // Count the number of voicenotes
-    let voicenote_count = count_voicenotes();
+    let voicenote_count = self.voicenote_vec.clone().unwrap().len();
     ui.label(format!("You have {} voicenotes.", voicenote_count));
 
     ui.add_space(10.0);
@@ -306,9 +309,9 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         if ui.button("▶️ Play All").clicked() {
             // Play all voicenote files
-            let directory = "."; // Main directory path
+            let directory = ".";
             let files = fs::read_dir(directory).unwrap();
-            let mut filenames: Vec<String> = Vec::new(); // Vector to store filenames
+            let mut filenames: Vec<String> = Vec::new(); 
 
             for file in files {
                 if let Ok(file) = file {
@@ -321,7 +324,6 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
                 }
             }
 
-            // Play the audio files
             for filename in filenames {
                 play_audio(&filename);
             }
@@ -346,12 +348,17 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
                 eprintln!("Error deleting .wav files: {}", err);
             } else {
                 println!("Successfully deleted .wav files");
-            }        
+            }  
+            self.followuser.clear();
+            self.email.clear();
+            self.userid= ObjectId::new();
+            self.conversation= None;       
+            self.error_message = None;
             self.username.clear();
             self.password.clear();
-            self.confirm_password.clear();
-            self.error_message = None;
-            self.current_page = Page::Login;
+            self.current_page = Page::Signup;
+            self.userslist= ObjectId::new();
+            self.voicenote_vec= None;
         }
     });
 
@@ -771,10 +778,6 @@ fn pause_audio(sink: &Sink) {
 // Function to stop the audio playback
 fn stop_audio(sink: &Sink) {
     sink.stop();
-}
-
-async fn save_audio() {
-
 }
 
 
