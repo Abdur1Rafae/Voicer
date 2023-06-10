@@ -34,6 +34,7 @@ pub struct Gui {
     username: String,
     followuser: String,
     password: String,
+    confirm_pass: String,
     email: String,
     userid: ObjectId,
     conversation: Option<db_config::conversation>,
@@ -75,6 +76,7 @@ impl Gui {
             followuser:String::new(),
             email: String::new(),
             password: String::new(),
+            confirm_pass: String::new(),
             theme: Theme::default(),
             voicenote_vec: None,
             userslist : ObjectId::new(),
@@ -83,113 +85,148 @@ impl Gui {
         }
     }
 
-    // Function to show the signup page UI
-    fn signup_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
-        let mut password_visible = true;
-        ui.vertical_centered(|ui|{
-            ui.heading("Sign up");
-            ui.add_space(10.0);
-    
-        });
-        ui.vertical(|ui|{
 
+// Function to show the signup page UI
+fn signup_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
+    let mut password_visible = true;
+    ui.vertical_centered(|ui| {
+        ui.add_space(10.0);
+        ui.heading("Sign up");
+        ui.add_space(10.0);
+    });
+    ui.vertical_centered(|ui| {
         // Group the contents of the signup page
-        ui.group(|ui| {
-            // Calculate available width for each column
-            let column_width = ui.available_width();
-            ui.horizontal(|ui| {
-                ui.label("Username: ");
-                let current_width = ui.available_width();
-                ui.add_space(110.0-(column_width-current_width)); // Add spacing between the heading and the buttons
-                ui.text_edit_singleline(&mut self.username);
-            });
-            ui.horizontal(|ui| {
-                ui.label("Email: ");
-                let current_width = ui.available_width();
-                ui.add_space(110.0-(column_width-current_width)); // Add spacing between the label and the text edit
-                ui.text_edit_singleline(&mut self.email);
-            });
-            ui.horizontal(|ui| {
-                ui.label("Password:  ");
-                let current_width = ui.available_width();
-                ui.add_space(110.0-(column_width-current_width));
-                ui.add(egui::TextEdit::singleline(&mut self.password).password(password_visible));
-                //ui.text_edit_singleline(&mut self.password);
-                         
+        ui.vertical_centered(|ui|{
 
+            ui.add_space(50.0);
+            ui.horizontal(|ui|{
+                ui.add_space(600.0);
             });
-            let mut confirm_pass = String::new();
-            ui.horizontal(|ui| {
-                ui.label("Confirm Password: ");
-                let current_width = ui.available_width();
-                ui.add_space(110.0-(column_width-current_width));
-                ui.add(egui::TextEdit::singleline(&mut confirm_pass).password(password_visible));
-            });
-            ui.add(egui::Checkbox::new(&mut password_visible, "Show Password"));
+        }
+        );});
 
-            ui.add_space(5.0);
-            if ui.button("Sign up").clicked() {
-                
-                // Handle signup button click
-                if self.password != confirm_pass {
-                    // Show an error message if the passwords don't match
-                    self.error_message = Some("Passwords don't match".to_string()); // Store error message in a variable
-                } else if self.username.is_empty() || self.password.is_empty() || self.email.is_empty() {
-                    // Show an error message if either the username or password is empty
-                    self.error_message = Some("All fields are required".to_string()); // Store error message in a variable
-                } else 
-                {
-                    let rt= Runtime::new().unwrap();
-                    let username= self.username.clone();
-                    let email= self.email.clone();
-                    let pass= self.password.clone();
-                    let (usercol, voicecol, database, client) = rt.block_on( async move
-                        {
-                            let response = tokio::spawn
-                            ( async move
-                                {
-                                    let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                    (user_collection, voice_note_collection, db, client)
-                                }
-                            ).await.unwrap();
+    ui.vertical_centered(|ui| {
+            // Group the contents of the signup page
+            ui.group(|ui| {
+                ui.vertical_centered(|ui| {
+                    // Group the contents of the signup page
+                    ui.vertical_centered(|ui|{
+            
+                        ui.add_space(10.0);
+                    }
+                    );});
+                // Calculate available width for each column
+                let column_width = ui.available_width();
+                ui.horizontal(|ui| {
+                    ui.add_space(200.0);
+                    ui.label("Username: ");
+                    let current_width = ui.available_width();
+                    ui.add_space(310.0 - (column_width - current_width)); // Add spacing between the heading and the buttons
+                    ui.text_edit_singleline(&mut self.username);
+                });
+                ui.horizontal(|ui| {
+                    ui.add_space(200.0);
+                    ui.label("Email: ");
+                    let current_width = ui.available_width();
+                    ui.add_space(310.0 - (column_width - current_width)); // Add spacing between the label and the text edit
+                    ui.text_edit_singleline(&mut self.email);
+                });
+                ui.horizontal(|ui| {
+                    ui.add_space(200.0);
+                    ui.label("Password:  ");
+                    let current_width = ui.available_width();
+                    ui.add_space(310.0 - (column_width - current_width));
+                    ui.add(egui::TextEdit::singleline(&mut self.password).password(password_visible));
+                    //ui.text_edit_singleline(&mut self.password);
+                });
+                ui.horizontal(|ui| {
+                    ui.add_space(200.0);
+                    ui.label("Confirm Password:  ");
+                    let current_width = ui.available_width();
+                    ui.add_space(310.0 - (column_width - current_width));
+                    ui.add(egui::TextEdit::singleline(&mut self.confirm_pass).password(password_visible));
+                    //ui.text_edit_singleline(&mut confirm_pass);
+                });
+                ui.add_space(5.0);
+                ui.horizontal(|ui| {
+                    ui.add_space(310.0);
+                    ui.add(egui::Checkbox::new(&mut password_visible, "Show Password"));
+                });
+    
+                ui.add_space(5.0);
+                ui.horizontal(|ui| {
+                ui.add_space(550.0);
+                if ui.button("Sign up").clicked() {
+                    // Handle signup button click
+                    if self.password != self.confirm_pass {
+                        // Show an error message if the passwords don't match
+                        self.error_message = Some("Passwords don't match".to_string()); // Store error message in a variable
+                    } else if self.username.is_empty() || self.password.is_empty() || self.email.is_empty() {
+                        // Show an error message if either the username or password is empty
+                        self.error_message = Some("All fields are required".to_string()); // Store error message in a variable
+                    } else {
+                        let rt = Runtime::new().unwrap();
+                        let username = self.username.clone();
+                        let email = self.email.clone();
+                        let pass = self.password.clone();
+                        let (usercol, voicecol, database, client) = rt.block_on(async move {
+                            let response = tokio::spawn(async move {
+                                let (user_collection, voice_note_collection, db, client) =
+                                    db_config::connect_to_mongodb().await;
+                                (user_collection, voice_note_collection, db, client)
+                            })
+                            .await
+                            .unwrap();
                             response
                         });
-
-                    let another_uc = usercol.clone();
-
-                    let response = rt.block_on( async move
-                        {
-                            let response = tokio::spawn
-                            ( async move
-                                {
-                                    let response = db_config::create_user(another_uc, email, pass, username).await;
-
-                                    response
-                                }
-                            ).await.unwrap();
+    
+                        let another_uc = usercol.clone();
+    
+                        let response = rt.block_on(async move {
+                            let response = tokio::spawn(async move {
+                                let response = db_config::create_user(another_uc, email, pass, username).await;
+    
+                                response
+                            })
+                            .await
+                            .unwrap();
                             response
                         });
-                    self.userid = response;
-                    self.current_page = Page::Login;
-
+                        self.userid = response;
+                        self.current_page = Page::Login;
+                    }
                 }
-            }
-            if let Some(error_message) = &self.error_message {
-                // Display error message if it exists
-                ui.add(egui::Label::new(error_message).text_color(egui::Color32::RED));
-            }
-            ui.horizontal(|ui| {
-                ui.label("Already have an account?");
-                if ui.button("Log in").clicked() {
-                    // Show the login page if the user clicks the login button
-                    self.username.clear();
-                    self.password.clear();
-                    self.error_message = None;
-                    self.current_page = Page::Login;
-                }
+                if let Some(error_message) = &self.error_message {
+                    // Display error message if it exists
+                    ui.add(egui::Label::new(error_message).text_color(egui::Color32::RED));
+                }});
+                ui.add_space(20.0);
+                ui.horizontal(|ui| {
+                    ui.add_space(750.0);
+                });
             });
-        });});
-    }
+                ui.add_space(5.0);
+                ui.horizontal(|ui| {
+                    ui.label("Already have an account?");
+                    if ui.button("Log in").clicked() {
+                        // Show the login page if the user clicks the login button
+                        self.username.clear();
+                        self.password.clear();
+                        self.error_message = None;
+                        self.current_page = Page::Login;
+                    }
+                });
+                ui.vertical_centered(|ui| {
+                    // Group the contents of the signup page
+                    ui.vertical_centered(|ui|{
+                      ui.add_space(20.0);
+                     
+                    }
+                    );});
+            });
+        
+}
+
 
 
 
@@ -202,64 +239,97 @@ impl Gui {
             
 
         });
+        ui.vertical_centered(|ui| {
+            // Group the contents of the signup page
+            ui.vertical_centered(|ui|{
+    
+                ui.add_space(50.0);
+                ui.horizontal(|ui|{
+                    ui.add_space(600.0);
+                });
+            }
+            );});
         
-        ui.add(egui::Label::new("Log in to your Voicer account"));
+        ui.add(egui::Label::new("Enter  your Voicer account details:").heading());
+        ui.add_space(5.0);
         // Group the contents of the login page
         ui.vertical_centered(|ui| {
+            // Group the contents of the signup page
             ui.group(|ui| {
-
-                ui.style_mut().wrap = Some(true);
+                ui.vertical_centered(|ui| {
+                    // Group the contents of the signup page
+                    ui.vertical_centered(|ui|{
+            
+                        ui.add_space(10.0);
+                    }
+                    );});
+                // Calculate available width for each column
                 let column_width = ui.available_width();
+            
                 ui.horizontal(|ui| {
-                    ui.label("Username :");
+                    ui.add_space(200.0);
+                    ui.label("Username: ");
                     let current_width = ui.available_width();
-                    ui.add_space(110.0-(column_width-current_width)); // Add spacing between the heading and the buttons    
+                    ui.add_space(310.0 - (column_width - current_width)); // Add spacing between the heading and the buttons
                     ui.text_edit_singleline(&mut self.username);
                 });
-    
+
                 ui.horizontal(|ui| {
+                    ui.add_space(200.0);
                     ui.label("Password :  ");
                     let current_width = ui.available_width();
-                    ui.add_space(110.0-(column_width-current_width)); // Add spacing between the heading and the buttons    
+                    ui.add_space(310.0-(column_width-current_width)); // Add spacing between the heading and the buttons    
                     ui.add(egui::TextEdit::singleline(&mut self.password).password(true));
                 });
+                ui.add_space(5.0);
+                ui.horizontal(|ui| {
+                ui.add_space(558.0);
+                    if ui.button("Log in").clicked() {
+     
+                    let rt= Runtime::new().unwrap();
+                    let username= self.username.clone();
+                    let pass= self.password.clone();
+                    let (response) = rt.block_on( async move
+                        {
+                            let response = tokio::spawn
+                            ( async move
+                                {
+                                    let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                    let response = db_config::get_user_by_username(user_collection.clone(), username, pass).await;
+                                    let user_iddd= response.unwrap()._id.clone();
+                                    let response2 = db_config::get_all_voice_ids_from_following(user_collection ,voice_note_collection , user_iddd).await;
+            
+                                    (user_iddd,response2)
+                                }
+                            ).await.unwrap();
+                            response
+                        });
+    
+                    self.userid = response.0.clone();
+                    self.voicenote_vec = Some(response.1.clone());
+                    println!("login successful : {:?}",response.0.clone() );
+    
+                    self.current_page = Page::Home;
+                    }
+                    });
+                    ui.add_space(5.0);
+                    ui.horizontal(|ui| {
+                        ui.add_space(750.0);
+                        ui.label("");
+                        
+                    });
+
             });
+            
         });
 
         ui.vertical(|ui|{
             ui.add_space(5.0);
 
+        
 
         });
-        ui.horizontal(|ui| {
-                if ui.button("Log in").clicked() {
- 
-                let rt= Runtime::new().unwrap();
-                let username= self.username.clone();
-                let pass= self.password.clone();
-                let (response) = rt.block_on( async move
-                    {
-                        let response = tokio::spawn
-                        ( async move
-                            {
-                                let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                let response = db_config::get_user_by_username(user_collection.clone(), username, pass).await;
-                                let user_iddd= response.unwrap()._id.clone();
-                                let response2 = db_config::get_all_voice_ids_from_following(user_collection ,voice_note_collection , user_iddd).await;
-        
-                                (user_iddd,response2)
-                            }
-                        ).await.unwrap();
-                        response
-                    });
 
-                self.userid = response.0.clone();
-                self.voicenote_vec = Some(response.1.clone());
-                println!("login successful : {:?}",response.0.clone() );
-
-                self.current_page = Page::Home;
-                }
-                });
 
                 if let Some(error_message) = &self.error_message {
                     // Display error message if it exists
