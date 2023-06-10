@@ -158,23 +158,30 @@ pub async fn create_user(user_collection: Collection<Users>, username: String, p
 
 
 pub async fn react_to_quote(voice_collection: Collection<VoiceNote>, v_id: ObjectId, user_id: ObjectId, reaction: ReactionType) {
-    let filter = doc!{"_id": v_id};
-
-    let user_reaction = Reaction{
+    let filter = doc! {
+        "reactions": {
+            "$elemMatch": { "user_id": user_id }
+        }
+    };
+    
+    let user_reaction = Reaction {
         user_id: user_id,
         reaction: reaction,
     };
-
+    
     let reaction_doc = bson::to_document(&user_reaction)
-    .expect("Failed to serialize reaction");
-
+        .expect("Failed to serialize reaction");
+    
     let update = doc! {
-        "$addToSet": { "reactions": reaction_doc }
+        "$set": { "reactions.$": reaction_doc }
     };
-
-    let options = UpdateOptions::builder().build();
-
-    let result = voice_collection.update_one(filter, update, options).await; 
+    
+    let options = UpdateOptions::builder()
+        .upsert(true) // Add a new document if no match is found
+        .build();
+    
+    let result = voice_collection.update_one(filter, update, options).await;
+     
 }
 
 pub async fn create_post(voice_collection: Collection<VoiceNote>, user_collection: Collection<Users>, user_id: ObjectId, data: Vec<i16>, voice_id: ObjectId) {

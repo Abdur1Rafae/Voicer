@@ -426,9 +426,10 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
             self.error_message = None;
             self.username.clear();
             self.password.clear();
-            self.current_page = Page::Signup;
             self.userslist= ObjectId::new();
             self.voicenote_vec= None;
+
+            self.current_page = Page::Login;
         }
     });
 
@@ -437,82 +438,84 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
     let mut vec_vc = self.voicenote_vec.clone();
     egui::ScrollArea::auto_sized().show(ui, |ui| {
         let userid = self.userid.clone();
-        let voice = vec_vc.unwrap();
-        // Display voicenote posts
-        for i in 0..voicenote_count {
-            let voice_obj = voice[i].clone();
-            ui.group(|ui| {
-                ui.label(format!("Voicenote {} by {}",i+1, voice_obj.name));
-
-                ui.horizontal(|ui| {
-                    if ui.button("▶️ Play").clicked() {
-                        let filename = voice_obj._id.to_hex()+".wav";
-                        let x = play_audio(&filename);
-                    }
-                });
-
-                let time = Utc.timestamp(voice_obj.timestamp.timestamp(), 0);
-                let formatted_time = time.format("%Y-%m-%d %H:%M:%S").to_string();
-
-                ui.label(format!("Posted on: {}", formatted_time));
-                let mut reaction = db_config::ReactionType::SpeakUp;
+        if let Some(vec_vc) = vec_vc{
+            let voice = vec_vc;
+            // Display voicenote posts
+            for i in 0..voicenote_count {
+                let voice_obj = voice[i].clone();
                 ui.group(|ui| {
+                    ui.label(format!("Voicenote {} by {}",i+1, voice_obj.name));
+
                     ui.horizontal(|ui| {
-                        if ui.button("Shut Up").clicked() {
-                            reaction = db_config::ReactionType::ShutUp;
-                            let rt= Runtime::new().unwrap();
-                            let (response) = rt.block_on( async move
-                                {
-                                    let response = tokio::spawn
-                                    ( async move
-                                        {
-                                            let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                            db_config::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
-                                        }
-                                    ).await.unwrap();
-                                    response
-                                }
-                            );
-                        }
-                        if ui.button("Speak Up").clicked() {
-                            reaction = db_config::ReactionType::SpeakUp;
-                            let rt= Runtime::new().unwrap();
-                            let (response) = rt.block_on( async move
-                                {
-                                    let response = tokio::spawn
-                                    ( async move
-                                        {
-                                            let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                            db_config::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
-                                        }
-                                    ).await.unwrap();
-                                    response
-                                }
-                            );
-                        }
-                        if ui.button("Conversation").clicked() {
-                            let rt= Runtime::new().unwrap();
-                            let (response) = rt.block_on( async move
-                                {
-                                    let response = tokio::spawn
-                                    ( async move
-                                        {
-                                            let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                            let replies = db_config::create_conversation(voice_note_collection, voice_obj._id).await;
-                    
-                                            (replies)
-                                        }
-                                    ).await.unwrap();
-                                    response
-                                });
-                            self.conversation = Some(response);
-                            self.current_page= Page::Conversation;
+                        if ui.button("▶️ Play").clicked() {
+                            let filename = voice_obj._id.to_hex()+".wav";
+                            let x = play_audio(&filename);
                         }
                     });
-                });
 
-                
-            });
+                    let time = Utc.timestamp(voice_obj.timestamp.timestamp(), 0);
+                    let formatted_time = time.format("%Y-%m-%d %H:%M:%S").to_string();
+
+                    ui.label(format!("Posted on: {}", formatted_time));
+                    let mut reaction = db_config::ReactionType::SpeakUp;
+                    ui.group(|ui| {
+                        ui.horizontal(|ui| {
+                            if ui.button("Shut Up").clicked() {
+                                reaction = db_config::ReactionType::ShutUp;
+                                let rt= Runtime::new().unwrap();
+                                let (response) = rt.block_on( async move
+                                    {
+                                        let response = tokio::spawn
+                                        ( async move
+                                            {
+                                                let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                                db_config::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
+                                            }
+                                        ).await.unwrap();
+                                        response
+                                    }
+                                );
+                            }
+                            if ui.button("Speak Up").clicked() {
+                                reaction = db_config::ReactionType::SpeakUp;
+                                let rt= Runtime::new().unwrap();
+                                let (response) = rt.block_on( async move
+                                    {
+                                        let response = tokio::spawn
+                                        ( async move
+                                            {
+                                                let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                                db_config::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
+                                            }
+                                        ).await.unwrap();
+                                        response
+                                    }
+                                );
+                            }
+                            if ui.button("Conversation").clicked() {
+                                let rt= Runtime::new().unwrap();
+                                let (response) = rt.block_on( async move
+                                    {
+                                        let response = tokio::spawn
+                                        ( async move
+                                            {
+                                                let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                                let replies = db_config::create_conversation(voice_note_collection, voice_obj._id).await;
+                        
+                                                (replies)
+                                            }
+                                        ).await.unwrap();
+                                        response
+                                    });
+                                self.conversation = Some(response);
+                                self.current_page= Page::Conversation;
+                            }
+                        });
+                    });
+
+                    
+                });
+            }
         }
     });
 
