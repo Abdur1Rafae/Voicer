@@ -15,6 +15,9 @@ use rodio::{OutputStream, Sink, source::Buffered};
 use std::{process::Command};
 use db_config::{connect_to_mongodb, VoiceNote};
 use record_audio::audio_clip::AudioClip as ac;
+use egui::TextStyle;
+use egui::RichText;
+
 
 // Enum to represent different pages/screens of the application
 enum Page {
