@@ -1,7 +1,7 @@
 use std::{fs::{self, File}, path::Path, vec};
 use chrono::{DateTime, Utc, TimeZone};
 use eframe::{run_native, epi::App, egui::{self}};
-use ::egui::color::srgba;
+use self::egui::color;
 use crate::db_config::{self, Users, publicUser, get_user_by_username, find_users_by_names};
 use mongodb::{Client, Collection  , Database};
 use mongodb::bson::{self,oid::ObjectId};
@@ -14,7 +14,7 @@ use std::{process::Command};
 use db_config::{connect_to_mongodb, VoiceNote};
 use record_audio::audio_clip::AudioClip as ac;
 
-// Enum to represent different pages/screens of the application
+
 enum Page {
     Signup,
     Login,
@@ -169,22 +169,11 @@ fn signup_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
                         let username = self.username.clone();
                         let email = self.email.clone();
                         let pass = self.password.clone();
-                        let (usercol, voicecol, database, client) = rt.block_on(async move {
+                        let (response) = rt.block_on(async move {
                             let response = tokio::spawn(async move {
                                 let (user_collection, voice_note_collection, db, client) =
                                     db_config::connect_to_mongodb().await;
-                                (user_collection, voice_note_collection, db, client)
-                            })
-                            .await
-                            .unwrap();
-                            response
-                        });
-    
-                        let another_uc = usercol.clone();
-    
-                        let response = rt.block_on(async move {
-                            let response = tokio::spawn(async move {
-                                let response = db_config::create_user(another_uc, email, pass, username).await;
+                                let response = db_config::create_user(user_collection, email, pass, username).await;
     
                                 response
                             })
@@ -192,7 +181,6 @@ fn signup_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
                             .unwrap();
                             response
                         });
-                        self.userid = response;
                         self.current_page = Page::Login;
                     }
                 }
@@ -225,11 +213,7 @@ fn signup_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
                     );});
             });
         
-}
-
-
-
-
+    }
     // Function to show the login page UI
     fn login_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
         ui.vertical_centered(|ui|{
@@ -325,36 +309,33 @@ fn signup_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
 
         ui.vertical(|ui|{
             ui.add_space(5.0);
-
-        
-
         });
 
 
-                if let Some(error_message) = &self.error_message {
-                    // Display error message if it exists
-                    ui.add(egui::Label::new(error_message).text_color(egui::Color32::RED));
+        if let Some(error_message) = &self.error_message {
+            // Display error message if it exists
+            ui.add(egui::Label::new(error_message).text_color(egui::Color32::RED));
+        }
+        ui.vertical(|ui|{
+                ui.add_space(10.0);
+    
+    
+            });
+        ui.horizontal(|ui| {
+                ui.label("Don't have an account?");
+                if ui.button("Sign up").clicked() {
+                    self.error_message = None;
+                    self.username.clear();
+                    self.password.clear();
+                    self.current_page = Page::Signup;
+                    self.userslist= ObjectId::new();
+                    self.voicenote_vec= None;
+                    self.followuser.clear();
+                    self.email.clear();
+                    self.userid= ObjectId::new();
+                    self.conversation= None; 
                 }
-            ui.vertical(|ui|{
-                    ui.add_space(10.0);
-        
-        
-                });
-            ui.horizontal(|ui| {
-                    ui.label("Don't have an account?");
-                    if ui.button("Sign up").clicked() {
-                        self.error_message = None;
-                        self.username.clear();
-                        self.password.clear();
-                        self.current_page = Page::Signup;
-                        self.userslist= ObjectId::new();
-                        self.voicenote_vec= None;
-                        self.followuser.clear();
-                        self.email.clear();
-                        self.userid= ObjectId::new();
-                        self.conversation= None; 
-                    }
-                });
+            });
             
     ;}
 
@@ -377,6 +358,7 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
     ui.add_space(10.0);
 
     ui.horizontal(|ui| {
+        ui.add_space(300.0);
         if ui.button("▶️ Play All").clicked() {
             // Play all voicenote files
             let directory = ".";
@@ -393,6 +375,7 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
                     }
                 }
             }
+
 
             for filename in filenames {
                 play_audio(&filename);

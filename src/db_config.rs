@@ -6,7 +6,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::io;
 use futures_util::StreamExt;
-use std::fs;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Users {
