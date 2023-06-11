@@ -158,29 +158,75 @@ pub async fn create_user(user_collection: Collection<Users>, username: String, p
 
 
 pub async fn react_to_quote(voice_collection: Collection<VoiceNote>, v_id: ObjectId, user_id: ObjectId, reaction: ReactionType) {
+    println!("{}",v_id);
     let filter = doc! {
+        "_id": v_id,
         "reactions": {
-            "$elemMatch": { "user_id": user_id }
+            "$elemMatch": {
+                "user_id": user_id
+            }
         }
     };
     
+
     let user_reaction = Reaction {
         user_id: user_id,
         reaction: reaction,
     };
-    
+
     let reaction_doc = bson::to_document(&user_reaction)
         .expect("Failed to serialize reaction");
-    
+
     let update = doc! {
         "$set": { "reactions.$": reaction_doc }
     };
-    
+
     let options = UpdateOptions::builder()
         .upsert(true) // Add a new document if no match is found
         .build();
-    
+
     let result = voice_collection.update_one(filter, update, options).await;
+    if let Ok(result) = result {
+        if result.modified_count == 0 {
+            let filter = doc!{"_id": v_id};
+
+            let user_reaction = Reaction{
+                user_id: user_id,
+                reaction: reaction,
+            };
+
+            let reaction_doc = bson::to_document(&user_reaction)
+            .expect("Failed to serialize reaction");
+
+            let update = doc! { "$push": { "reactions": reaction_doc} };
+
+            let options = UpdateOptions::builder().build();
+
+            let result = voice_collection.update_one(filter, update, options).await; 
+            println!("Reaction inserted");
+        }
+        else{
+            println!("Reaction updated");
+        }
+    }
+    else{
+        let filter = doc!{"_id": v_id};
+
+        let user_reaction = Reaction{
+            user_id: user_id,
+            reaction: reaction,
+        };
+
+        let reaction_doc = bson::to_document(&user_reaction)
+        .expect("Failed to serialize reaction");
+
+        let update = doc! { "$push": { "reactions": reaction_doc} };
+
+        let options = UpdateOptions::builder().build();
+
+        let result = voice_collection.update_one(filter, update, options).await; 
+        println!("Reaction inserted");
+    }
      
 }
 
