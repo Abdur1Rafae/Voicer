@@ -14,10 +14,10 @@ path = "src/db_config.rs"
 
 
 [dependencies]
-eframe = "0.15.0"
+eframe = "0.22.0"
 egui = "0.22.0"
-egui_glium = "0.18.0"
-glium = "0.31.0"
+egui_glium = "0.20.1"
+glium = "0.32.1"
 futures-util = "0.3"
 regex = "1.6.1"
 record-audio = "0.1.1"
