@@ -1,3 +1,4 @@
+use mongodb::bson::datetime::Error;
 use mongodb::{Client, Collection  , Database};
 use mongodb::options::FindOneAndUpdateOptions;
 use mongodb::bson::{self,oid::ObjectId, doc};
@@ -7,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::io;
 use futures_util::StreamExt;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Users {
     pub _id: bson::oid::ObjectId,
     pub username:String,
@@ -271,6 +272,30 @@ pub async fn create_post(voice_collection: Collection<VoiceNote>, user_collectio
     save_voice_note(user_collection, user_id, voice_id).await;
 }
 
+
+pub async fn delete_post(voice_note_collection: Collection<VoiceNote>,user_collection: Collection<Users>,voice_note_id: ObjectId,user_id: ObjectId,) {
+    let delete_result = voice_note_collection
+        .delete_one(doc! {"_id": voice_note_id}, None)
+        .await;
+
+    if let Err(err) = delete_result {
+        println!("Failed to delete voice note: {}", err);
+        return;
+    }
+
+    let filter = doc! {"_id": user_id};
+    let update = doc! { "$pull": { "voice_notes": voice_note_id.to_hex() } };
+    let options = None;
+
+    let update_result = user_collection.update_one(filter, update, options).await;
+
+    if let Err(err) = update_result {
+        println!("Failed to update user document: {}", err);
+        return;
+    }
+}
+
+
 pub async fn convert_audio_to_vec(filename: &str) -> Vec<i16> {
     let mut reader = hound::WavReader::open(filename).unwrap();
     
@@ -324,7 +349,7 @@ pub async fn create_comment(voice_collection: Collection<VoiceNote>, user_collec
         timestamp: Utc::now()
     };
     new_voice_note.insert_one(voice_collection.clone()).await;
-    save_voice_note(user_collection, user_id, comment_id).await;
+    //save_voice_note(user_collection, user_id, comment_id).await;
     add_reply(voice_collection, voice_id, comment_id).await;
 }
 
@@ -436,20 +461,27 @@ pub async fn update_user_name_by_username(user_collection: Collection<Users>, us
 
 pub async fn follow(user_collection: Collection<Users>, user_id: ObjectId, fuser_id:ObjectId) {
     let filter = doc! {"_id": user_id};
-
     let update = doc! { "$push": { "following": fuser_id.to_hex()} };
-
     let options = UpdateOptions::builder().build();
-
     let result = user_collection.update_one(filter, update, options).await; 
 
     let filter2 = doc!{"_id": fuser_id};
-
     let update2= doc! {"$push" : {"followers": user_id.to_hex()}};
-
     let options2 = UpdateOptions::builder().build();
-
     let result2 = user_collection.update_one(filter2, update2, options2).await;
+}
+
+pub async fn unfollow(user_collection: Collection<Users>, user_id: ObjectId, fuser_id: ObjectId) -> Vec<publicUser> {
+    let filter = doc! {"_id": user_id};
+    let update = doc! { "$pull": { "following": fuser_id.to_hex()} };
+    let options = UpdateOptions::builder().build();
+    let result = user_collection.update_one(filter, update, options).await;
+
+    let filter2 = doc!{"_id": fuser_id};
+    let update2 = doc! {"$pull" : {"followers": user_id.to_hex()}};
+    let options2 = UpdateOptions::builder().build();
+    let result2 = user_collection.update_one(filter2, update2, options2).await;
+    get_all_following_profile(user_collection, user_id).await
 }
 
 pub async fn update_password_by_username(user_collection: Collection<Users>, username: &str, new_password: &str) -> bool {
@@ -520,10 +552,10 @@ async fn save_voice_note(collection: Collection<Users> ,userid: ObjectId, v_id: 
 }
 
 async fn get_all_following(user_collection: Collection<Users> , user_id: ObjectId) -> Vec<ObjectId> {
-    
     let filter = doc! {"_id": user_id};
     let mut cursor = user_collection.find(filter, None).await.expect("Failed to execute find.");
     let mut following = Vec::new();
+
     while let Some(result) = cursor.next().await {
         if let Ok(user) = result {
             for i in user.following {
@@ -531,34 +563,66 @@ async fn get_all_following(user_collection: Collection<Users> , user_id: ObjectI
             }
         }        
     }
+    
 
     following
+}
+
+pub async fn get_all_following_profile(user_collection: Collection<Users>, user_id: ObjectId) -> Vec<publicUser> {
+    let following_ids = get_all_following(user_collection.clone(), user_id.clone()).await;
+    let mut users =Vec::new();
+    let mut var=0;
+
+    for i in 0..following_ids.len() {
+        let filter = doc! { "_id": following_ids[i] };
+        let mut cursor = user_collection.find(filter, None).await.expect("Failed to execute find.");
+        while let Some(result) = cursor.next().await {
+            if let Ok(user) = result {
+                if user._id != user_id {
+                    let pub_user = publicUser {
+                        refNo: var,
+                        _id: user._id,
+                        username: user.username,
+                        name: user.name,
+                        description: user.description,
+                        followers: user.followers,
+                        following: user.following,
+                        voice_notes: user.voice_notes,
+                    };
+                    users.push(pub_user);
+                    var= var+1;
+                }
+            }
+        }
+    }
+
+    users
 }
 
 
 pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> , voice_collection:Collection<VoiceNote> , user_id:ObjectId) -> Vec<VoiceNote>{
     let following = get_all_following(user_collection.clone(), user_id).await;
     println!("You follow {:?}", following);
-        let mut voice_ids = Vec::new();
-        for i in following {
-            let filter = doc! {"_id": i};
-            let mut cursor = user_collection.find(filter, None).await.expect("Failed to execute find.");
-            while let Some(result) = cursor.next().await {
-                if let Ok(user) = result {
-                    for k in user.voice_notes {
-                        let filter = doc! {"_id": k, "is_post" : true};
-                        let mut cursor = voice_collection.find(filter, None).await.expect("Failed to execute find.");            
-                        while let Some(result) = cursor.next().await {
-                            if let Ok(voice) = result {
-                                if(voice.is_post == true) {
-                                    voice_ids.push(voice);
-                                }
+    let mut voice_ids = Vec::new();
+    for i in following {
+        let filter = doc! {"_id": i};
+        let mut cursor = user_collection.find(filter, None).await.expect("Failed to execute find.");
+        while let Some(result) = cursor.next().await {
+            if let Ok(user) = result {
+                for k in user.voice_notes {
+                    let filter = doc! {"_id": k, "is_post" : true};
+                    let mut cursor = voice_collection.find(filter, None).await.expect("Failed to execute find.");            
+                    while let Some(result) = cursor.next().await {
+                        if let Ok(voice) = result {
+                            if(voice.is_post == true) {
+                                voice_ids.push(voice);
                             }
                         }
                     }
-                }        
-            }
+                }
+            }        
         }
+    }
 
     sort_voice_notes_by_timestamp_desc(&mut voice_ids);
     for i in &voice_ids {
@@ -572,28 +636,34 @@ pub fn sort_voice_notes_by_timestamp_desc(notes : &mut Vec<VoiceNote>) {
     notes.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 }
 
-pub async fn download_voice_notes(voice_collection : Collection<VoiceNote> , v_id : ObjectId){
+pub async fn download_voice_notes(voice_collection : Collection<VoiceNote> , v_id : ObjectId) -> bool{
     let filter = doc! {"_id": v_id.clone()};
-    let result = voice_collection.find_one(filter, None).await;
+    let result: Result<Option<VoiceNote>, mongodb::error::Error> = voice_collection.find_one(filter, None).await;
     let mut voice:Vec<i16> = Vec::new();
-    let mut post = true;
-    voice = match result.expect("Error finding voice") {
-        Some(result) => { 
-            if result.is_post == false {
-                post = false;
+    if let Ok(value) = result {
+        voice = match value {
+            Some(value) => { 
+                value.data
+            },
+            None => {
+                println!("No voice data found");
+                Vec::new()
+        
             }
-            result.data
-        },
-        None => {
-            println!("No voice data found");
-            Vec::new()
+        };
     
-        }
-    };
+        let mut filename =  v_id.to_string() + ".wav";
+    
+        convert_vec_to_audio(&filename , voice).await; 
 
-    let mut filename =  v_id.to_string() + ".wav";
-
-    convert_vec_to_audio(&filename , voice).await;   
+        return true;
+    } else if let Err(error) = result {
+        println!("Error: {}", error);
+        return false;
+    }
+    else{
+        return false;
+    }
 }
 
 

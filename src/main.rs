@@ -1,12 +1,12 @@
 #![allow(warnings)]
 
-use UI::Gui;
+use frontend::Gui;
 
 use tokio::{io, time::Instant};
 pub use eframe::{run_native, App, egui::{self}};
 
-pub mod UI;
-pub mod db_config;
+pub mod frontend;
+pub mod backend;
 
 fn main() {
     let app = Gui::new();

@@ -9,8 +9,8 @@ name = "main"
 path = "src/main.rs"
 
 [[bin]]
-name = "db_config"
-path = "src/db_config.rs"
+name = "backend"
+path = "src/backend.rs"
 
 
 [dependencies]

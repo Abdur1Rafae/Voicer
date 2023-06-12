@@ -5,7 +5,7 @@ use std::{fs::{self, File}, path::Path, vec};
 use chrono::{DateTime, Utc, TimeZone};
 pub use eframe::{run_native, egui, App};
 use egui::{Ui, Color32};
-use crate::db_config::{self, Users, publicUser, get_user_by_username, find_users_by_names};
+use crate::backend::{self, Users, publicUser, get_user_by_username, find_users_by_names};
 use mongodb::{Client, Collection  , Database};
 use mongodb::bson::{self,oid::ObjectId};
 use tokio::{io, time::Instant, runtime::Runtime};
@@ -13,7 +13,7 @@ use tokio;
 use std::io::BufReader;
 use rodio::{OutputStream, Sink, source::Buffered};
 use std::{process::Command};
-use db_config::{connect_to_mongodb, VoiceNote};
+use backend::{connect_to_mongodb, VoiceNote};
 use record_audio::audio_clip::AudioClip as ac;
 use egui::TextStyle;
 use egui::RichText;
@@ -27,24 +27,26 @@ enum Page {
     Home,
     MyTweet,
     Follow,
-    FollowerPost,
-    Conversation
+    FollowerProfile,
+    Conversation,
+    UserProfile,
+    Following,
 }
 pub struct Gui {
     current_page: Page,
     error_message: Option<String>,
-    userslist: Option<db_config::publicUser>,
-    voicenote_vec: Option<Vec<db_config::VoiceNote>>,
+    userslist: Option<backend::publicUser>,
+    voicenote_vec: Option<Vec<backend::VoiceNote>>,
     username: String,
     followuser: String,
     password: String,
     confirm_pass: String,
     email: String,
-    userid: ObjectId,
-    conversation: Option<db_config::conversation>,
+    user: Option<backend::Users>,
+    conversation: Option<backend::conversation>,
     theme: Theme,
+    following: Option<Vec<backend::publicUser>>,
     window_style: egui::Style,
-
 }
 
 enum Theme {
@@ -87,10 +89,11 @@ impl Gui {
             theme: Theme::default(),
             voicenote_vec: None,
             userslist : None,
-            userid: ObjectId::new(),
+            user: None,
             conversation: None,
+            following: None,
             window_style: egui::Style::default(),  
-    }
+        }
     }
 
 
@@ -181,8 +184,8 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                         let (response) = rt.block_on(async move {
                             let response = tokio::spawn(async move {
                                 let (user_collection, voice_note_collection, db, client) =
-                                    db_config::connect_to_mongodb().await;
-                                let response = db_config::create_user(user_collection, email, pass, username).await;
+                                    backend::connect_to_mongodb().await;
+                                let response = backend::create_user(user_collection, email, pass, username).await;
     
                                 response
                             })
@@ -216,10 +219,9 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                 ui.vertical_centered(|ui| {
                     // Group the contents of the signup page
                     ui.vertical_centered(|ui|{
-                      ui.add_space(20.0);
-                     
-                    }
-                    );});
+                        ui.add_space(20.0);
+                    });
+                });
             });
         
     }
@@ -288,20 +290,21 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                                 let response = tokio::spawn
                                 ( async move
                                     {
-                                        let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                        let response = db_config::get_user_by_username(user_collection.clone(), username, pass).await;
-                                        let user_iddd= response.unwrap()._id.clone();
-                                        let response2 = db_config::get_all_voice_ids_from_following(user_collection ,voice_note_collection , user_iddd).await;
+                                        let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                        let response = backend::get_user_by_username(user_collection.clone(), username, pass).await;
+                                        let user_iddd= response.clone().unwrap()._id;
+                                        let response2 = backend::get_all_voice_ids_from_following(user_collection ,voice_note_collection , user_iddd).await;
                 
-                                        (user_iddd,response2)
+                                        (response,response2)
                                     }
                                 ).await.unwrap();
                                 response
                             });
 
-                        self.userid = response.0.clone();
+                        self.user = response.0.clone();
                         self.voicenote_vec = Some(response.1.clone());
-                        println!("login successful : {:?}",response.0.clone() );
+                        //println!("login successful : {:?}",response.0.clone() );
+                        println!("LOGIN SUCCESSFUL");
                         self.current_page = Page::Home;
                     }
                 });
@@ -331,7 +334,7 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                 self.voicenote_vec= None;
                 self.followuser.clear();
                 self.email.clear();
-                self.userid= ObjectId::new();
+                self.user= None;
                 self.conversation= None; 
             }
         });
@@ -355,7 +358,7 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
     ui.add_space(10.0);
 
     ui.horizontal(|ui| {
-        ui.add_space(445.0);
+        ui.add_space(420.0);
         if ui.button("▶️ Play All").clicked() {
             // Play all voicenote files
             let directory = ".";
@@ -392,6 +395,35 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
             self.toggle_theme(ctx);
         }
 
+        if ui.button("Profile").clicked() {
+            let user = self.user.clone().unwrap();
+            let rt = Runtime::new().unwrap();
+            let mut delete:Vec<ObjectId> = rt.block_on( async move
+                {
+                    let response = tokio::spawn
+                    ( async move
+                        {
+                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                            let mut delete:Vec<ObjectId> = Vec::new();
+                            for quote in user.voice_notes {
+                                let response = backend::download_voice_notes(voice_note_collection.clone(), quote).await;
+                                if response == false {
+                                    delete.push(quote);
+                                }
+                            }
+                            delete
+                        }
+                    ).await.unwrap();
+                    response
+                }
+            );
+            for quote in &mut delete{
+                self.user.as_mut().unwrap().voice_notes.retain(|voiceid| (voiceid.to_hex())!=(quote.to_hex()));
+            }
+            self.current_page = Page::UserProfile;
+        }
+
+
         if ui.button("Logout").clicked() {
             // Redirect to Login page and clear user data
             if let Err(err) = delete_wav_files() {
@@ -401,14 +433,13 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
             }  
             self.followuser.clear();
             self.email.clear();
-            self.userid= ObjectId::new();
+            self.user= None;
             self.conversation= None;       
             self.error_message = None;
             self.username.clear();
             self.password.clear();
             self.userslist= None;
             self.voicenote_vec= None;
-
             self.current_page = Page::Login;
         }
     });
@@ -419,7 +450,7 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
 
     let mut vec_vc = self.voicenote_vec.clone();
     egui::ScrollArea::vertical().show(ui, |ui| {
-        let userid = self.userid.clone();
+        let userid = self.user.clone().unwrap()._id;
         if let Some(vec_vc) = vec_vc{
             let voice = vec_vc;
             // Display voicenote posts
@@ -432,7 +463,6 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
                             ui.add_space(150.0);
                             ui.vertical(|ui|{
                                 ui.label(format!("Voicenote {} by {}",i+1, voice_obj.name));
-    
                                 ui.horizontal(|ui| {
                                     ui.add_space(75.0);
                                     if ui.add(egui::Button::new("▶️ Play").fill(Color32::TRANSPARENT)).clicked() {
@@ -445,19 +475,19 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
                                 let formatted_time = time.format("%Y-%m-%d %H:%M:%S").to_string();
             
                                 ui.label(format!("Posted on: {}", formatted_time));
-                                let mut reaction = db_config::ReactionType::SpeakUp;
+                                let mut reaction = backend::ReactionType::SpeakUp;
                                 ui.group(|ui| {
                                     ui.horizontal(|ui| {
                                         if ui.add(egui::Button::new("Shut Up").fill(Color32::LIGHT_RED)).clicked() {
-                                            reaction = db_config::ReactionType::ShutUp;
+                                            reaction = backend::ReactionType::ShutUp;
                                             let rt= Runtime::new().unwrap();
                                             let (response) = rt.block_on( async move
                                                 {
                                                     let response = tokio::spawn
                                                     ( async move
                                                         {
-                                                            let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                                            db_config::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
+                                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                                            backend::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
                                                         }
                                                     ).await.unwrap();
                                                     response
@@ -465,15 +495,15 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
                                             );
                                         }
                                         if ui.add(egui::Button::new("Speak Up").fill(Color32::LIGHT_GREEN)).clicked() {
-                                            reaction = db_config::ReactionType::SpeakUp;
+                                            reaction = backend::ReactionType::SpeakUp;
                                             let rt= Runtime::new().unwrap();
                                             let (response) = rt.block_on( async move
                                                 {
                                                     let response = tokio::spawn
                                                     ( async move
                                                         {
-                                                            let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                                            db_config::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
+                                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                                            backend::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
                                                         }
                                                     ).await.unwrap();
                                                     response
@@ -487,8 +517,8 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
                                                     let response = tokio::spawn
                                                     ( async move
                                                         {
-                                                            let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                                            let replies = db_config::create_conversation(voice_note_collection, voice_obj._id).await;
+                                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                                            let replies = backend::create_conversation(voice_note_collection, voice_obj._id).await;
                                     
                                                             (replies)
                                                         }
@@ -516,12 +546,12 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
 fn conversation(&mut self, ctx: &egui::Context, ui: &mut egui::Ui){
     ui.heading("Conversation");
     ui.add_space(10.0);
-    let folder_name = format!("{}", self.userid);
+    let folder_name = format!("{}", self.user.clone().unwrap()._id);
     fs::create_dir_all(&folder_name).unwrap();
     let mut file_name = ObjectId::new();
     let directory = format!("{}/{}.wav", folder_name, file_name.to_hex());
     let mut reply = self.conversation.clone().unwrap();
-    let userid = self.userid.clone();
+    let userid = self.user.clone().unwrap()._id;;
     
     if ui.button("Back").clicked() {
         self.current_page = Page::Home;
@@ -547,14 +577,14 @@ fn conversation(&mut self, ctx: &egui::Context, ui: &mut egui::Ui){
                 let response = tokio::spawn
                 ( async move
                     {
-                        let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                        let data = db_config::convert_audio_to_vec(&directory).await;
-                        db_config::create_comment(voice_note_collection.clone(),user_collection, userid, reply.v_id.to_hex() , file_name, data).await;
+                        let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                        let data = backend::convert_audio_to_vec(&directory).await;
+                        backend::create_comment(voice_note_collection.clone(),user_collection, userid, reply.v_id.to_hex() , file_name, data).await;
                         match fs::remove_dir_all(&(Path::new(&folder_name))) {
                             Ok(_) => println!("Directory deleted successfully"),
                             Err(err) => println!("Error deleting directory: {}", err),
                         }
-                        let replies = db_config::create_conversation(voice_note_collection, reply.v_id).await;
+                        let replies = backend::create_conversation(voice_note_collection, reply.v_id).await;
                 
                         (replies)
                     }
@@ -568,68 +598,67 @@ fn conversation(&mut self, ctx: &egui::Context, ui: &mut egui::Ui){
     let mut reply_count = reply.replies.len();
 
     egui::ScrollArea::vertical().show(ui, |ui| {
-    let voice_obj = reply.clone().replies;
-    // Display voicenote posts
-    for i in 0..reply_count {
-        let voice = voice_obj[i].clone();
-        ui.group(|ui| {
-            ui.label(format!("Reply {} by {}",i+1, voice.user_id.1));
-            // Add content for each voicenote post here
-
-            // Play single voicenote button
-            ui.horizontal(|ui| {
-                if ui.button("▶️ Play").clicked() {
-                    let filename = voice._id.to_hex()+".wav";
-                    let x = play_audio(&filename);
-                }
-            });
-
-            let mut reaction = db_config::ReactionType::SpeakUp;
+        let voice_obj = reply.clone().replies;
+        // Display voicenote posts
+        for i in 0..reply_count {
+            let voice = voice_obj[i].clone();
             ui.group(|ui| {
+                ui.label(format!("Reply {} by {}",i+1, voice.user_id.1));
+
                 ui.horizontal(|ui| {
-                    if ui.button("Shut Up").clicked() {
-                        reaction = db_config::ReactionType::ShutUp;
-                        let rt= Runtime::new().unwrap();
-                        let (response) = rt.block_on( async move
-                            {
-                                let response = tokio::spawn
-                                ( async move
-                                    {
-                                        let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                        db_config::react_to_quote(voice_note_collection, voice._id,userid,reaction.clone()).await;
-                                    }
-                                ).await.unwrap();
-                                response
-                            }
-                        );
-                    }
-                    if ui.button("Speak Up").clicked() {
-                        reaction = db_config::ReactionType::SpeakUp;
-                        let rt= Runtime::new().unwrap();
-                        let (response) = rt.block_on( async move
-                            {
-                                let response = tokio::spawn
-                                ( async move
-                                    {
-                                        let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                        db_config::react_to_quote(voice_note_collection, voice._id,userid,reaction.clone()).await;
-                                    }
-                                ).await.unwrap();
-                                response
-                            }
-                        );
+                    if ui.button("▶️ Play").clicked() {
+                        let filename = voice._id.to_hex()+".wav";
+                        let x = play_audio(&filename);
                     }
                 });
-            });
 
-            
-        });
-    }});
+                let mut reaction = backend::ReactionType::SpeakUp;
+                ui.group(|ui| {
+                    ui.horizontal(|ui| {
+                        if ui.add(egui::Button::new("Shut Up").fill(Color32::LIGHT_RED)).clicked() {
+                            reaction = backend::ReactionType::ShutUp;
+                            let rt= Runtime::new().unwrap();
+                            let (response) = rt.block_on( async move
+                                {
+                                    let response = tokio::spawn
+                                    ( async move
+                                        {
+                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                            backend::react_to_quote(voice_note_collection, voice._id,userid,reaction.clone()).await;
+                                        }
+                                    ).await.unwrap();
+                                    response
+                                }
+                            );
+                        }
+                        if ui.add(egui::Button::new("Shut Up").fill(Color32::LIGHT_GREEN)).clicked() {
+                            reaction = backend::ReactionType::SpeakUp;
+                            let rt= Runtime::new().unwrap();
+                            let (response) = rt.block_on( async move
+                                {
+                                    let response = tokio::spawn
+                                    ( async move
+                                        {
+                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                            backend::react_to_quote(voice_note_collection, voice._id,userid,reaction.clone()).await;
+                                        }
+                                    ).await.unwrap();
+                                    response
+                                }
+                            );
+                        }
+                    });
+                });
+
+                
+            });
+        }
+    });
 }
 
 fn tweet_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
     let column_width = ui.available_width();
-    let folder_name = format!("{}", self.userid);
+    let folder_name = format!("{}", self.user.clone().unwrap()._id);
     fs::create_dir_all(&folder_name).unwrap();
     let mut file_name = ObjectId::new();
     let directory = format!("{}/{}.wav", folder_name, file_name.to_hex());
@@ -652,17 +681,16 @@ fn tweet_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
             }
             Err(err) => println!("Error {}", err),
         }
-        let userid = self.userid;
+        let userid =self.user.clone().unwrap()._id;;
         let rt= Runtime::new().unwrap();
         let response = rt.block_on( async move
             {
                 let response = tokio::spawn
                 ( async move
                     {
-                        let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                        println!("{userid}");
-                        let data = db_config::convert_audio_to_vec(&directory).await;
-                        db_config::create_post(voice_note_collection,user_collection, userid, data, file_name).await;
+                        let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                        let data = backend::convert_audio_to_vec(&directory).await;
+                        backend::create_post(voice_note_collection,user_collection, userid, data, file_name).await;
                         match fs::remove_dir_all(&(Path::new(&folder_name))) {
                             Ok(_) => println!("Directory deleted successfully"),
                             Err(err) => println!("Error deleting directory: {}", err),
@@ -705,33 +733,27 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
             if ui.button("Search").clicked() 
             {   
                 let user2=self.followuser.clone();
-                let userid2= self.userid.clone();
+                let userid2= self.user.clone().unwrap()._id;
                 let rt= Runtime::new().unwrap();
                     let (userlistr) = rt.block_on( async move
                         {
                             let response = tokio::spawn
                             ( async move
                                 {
-                                    let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                    let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
                                     let userlistr=find_users_by_names(user_collection, & user2, userid2).await;
                                     userlistr
                                 }
                             ).await.unwrap();
                             response
                         });
-
                 self.userslist=Some(userlistr);
-                self.current_page=Page::FollowerPost;
-                         
-               
+                self.current_page=Page::FollowerProfile;
             }
-
         });
-    
         ui.add_space(10.0);
-        
     }
-        // Function to show the Shared Files page UI
+
     fn follow_user_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
 
         ui.label(format!("User Profile"));
@@ -745,7 +767,7 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         ui.label(format!("Following: {}", user.following.len()));
         
         if ui.button("Follow").clicked() {
-            let mut myuser=self.userid;
+            let mut myuser=self.user.clone().unwrap()._id;
             let mut myfol=self.userslist.clone().unwrap()._id;
             let rt= Runtime::new().unwrap();
                 let (userlistr) = rt.block_on( async move
@@ -753,9 +775,8 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                         let response = tokio::spawn
                         ( async move
                             {
-                                let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                db_config::follow(user_collection.clone(), myuser, myfol).await;
-
+                                let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                backend::follow(user_collection.clone(), myuser, myfol).await;
                             }
                         ).await.unwrap();
                         response
@@ -764,12 +785,145 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
             self.current_page=Page::Home;
         }
         if ui.button("Back").clicked() {
-            
             self.current_page = Page::Home;
-        }
-            
-        }
+        } 
     }
+
+
+    fn user_profile(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui){
+        let mut your_info = self.user.clone().unwrap();
+        ui.vertical_centered(|ui|{
+            ui.add_space(10.0);
+            ui.heading("Your Profile");
+        });
+
+        ui.label(format!("Name:\t\t\t{}", your_info.name));
+        ui.label(format!("Username:\t{}", your_info.username));
+        ui.horizontal(|ui|{
+            ui.label("Bio: ");
+            let current_width = ui.available_width();
+            ui.text_edit_singleline(&mut your_info.description);
+            if ui.button("Update Bio").clicked() {
+                let rt= Runtime::new().unwrap();
+                let (userlistr) = rt.block_on( async move
+                    {
+                        let response = tokio::spawn
+                        ( async move
+                            {
+                                let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                backend::update_description_by_username(user_collection, &your_info.username, &your_info.description).await;
+                            }
+                        ).await.unwrap();
+                        response
+                    });
+                    ui.label(format!("Successfull"));
+                    self.current_page=Page::Home;
+            }
+        });
+        let followers_count = your_info.followers.len();
+        let following_count = your_info.following.len();
+        
+        if ui.add(egui::Button::new(format!("Followers: {}", followers_count))).clicked() {
+
+        };
+
+        if ui.add(egui::Button::new(format!("Following: {}", following_count))).clicked() {
+            let rt= Runtime::new().unwrap();
+            let (userlistr) = rt.block_on( async move
+                {
+                    let response = tokio::spawn
+                    ( async move
+                        {
+                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                            backend::get_all_following_profile(user_collection, your_info._id).await
+                        }
+                    ).await.unwrap();
+                    response
+                });
+            self.following = Some(userlistr);
+            self.current_page=Page::Following;
+        };
+        
+        let mut quotes_count = your_info.voice_notes.len();
+
+
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            for i in 0..quotes_count {
+                ui.group(|ui| {
+                    ui.label(format!("Quote {}",i+1));
+
+                    ui.horizontal(|ui| {
+                        if ui.button("▶️ Play").clicked() {
+                            let filename = your_info.voice_notes[i].to_hex()+".wav";
+                            let x = play_audio(&filename);
+                        }
+                        let post = your_info.voice_notes[i].clone();
+                        if ui.button("Delete").clicked() {
+                            let rt= Runtime::new().unwrap();
+                            let (userlistr) = rt.block_on( async move
+                                {
+                                    let response = tokio::spawn
+                                    ( async move
+                                        {
+                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                            backend::delete_post(voice_note_collection, user_collection, post, your_info._id).await
+                                        }
+                                    ).await.unwrap();
+                                    response
+                            });
+                        }
+                    });
+                });
+            }
+        });
+
+        if ui.button("HOME").clicked() {
+            self.current_page= Page::Home;
+        }
+
+    }
+
+    fn following_profiles_display(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
+        ui.label(format!("You Follow: "));
+        let mut followingList = self.following.clone().unwrap();
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            for i in 0..followingList.len(){
+                ui.add_space(15.0);
+                ui.group(|ui|{
+                    let user = followingList[i].clone();
+                    ui.label(format!("Name:\t\t\t{}", user.name));
+                    ui.label(format!("Username:\t{}", user.username));
+                    ui.label(format!("Bio:       {}", user.description));
+                    ui.label(format!("Quotes:\t\t{}", user.voice_notes.len()));
+                    ui.label(format!("Followers: {}", user.followers.len()));
+                    ui.label(format!("Following: {}", user.following.len()));
+                    
+                    if ui.button("Unfollow").clicked() {
+                        let mut myuser=self.user.clone().unwrap()._id;
+                        let mut following=user._id.clone();
+                        let rt= Runtime::new().unwrap();
+                            let (userlistr) = rt.block_on( async move
+                                {
+                                    let response = tokio::spawn
+                                    ( async move
+                                        {
+                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                            backend::unfollow(user_collection.clone(), myuser, following).await
+                                        }
+                                    ).await.unwrap();
+                                    response
+                                });
+                        self.following = Some(userlistr);
+                        ui.label(format!("Successfull"));
+                    }
+                });
+            }
+        });
+        if ui.button("Back").clicked() {
+            self.current_page = Page::Home;
+        } 
+    }
+}
     
 
 
@@ -794,11 +948,17 @@ impl App for Gui {
                 Page::Follow => {
                     self.FollowPage(ctx, ui);
                 },
-                Page::FollowerPost => {
+                Page::FollowerProfile => {
                     self.follow_user_page(ctx, ui);
-                }
+                },
                 Page::Conversation => {
                     self.conversation(ctx, ui);
+                },
+                Page::UserProfile => {
+                    self.user_profile(ctx, ui);
+                },
+                Page::Following => {
+                    self.following_profiles_display(ctx, ui);
                 }
             }
         });
@@ -806,7 +966,7 @@ impl App for Gui {
 
 }
 
-// Function to count the number of .wav files in the main directory
+
 fn count_voicenotes() -> usize {
     let directory = "."; // Main directory path
     let files = fs::read_dir(directory).unwrap();
@@ -827,37 +987,33 @@ fn count_voicenotes() -> usize {
 
 use rodio::{source::Source};
 
-// Function to play the audio and return the Sink object
 use rodio::{Decoder};
 
-// Function to play the audio
+
 fn play_audio(filename: &str) {
     let (_stream, stream_handle) = OutputStream::try_default().unwrap();
     let sink = Sink::try_new(&stream_handle).unwrap();
     let file = File::open(filename).unwrap();
     let source = Decoder::new(BufReader::new(file)).unwrap();
 
-    // Play the audio
     sink.append(source);
     sink.sleep_until_end();
 }
 
-// Function to pause the audio playback
+
 fn pause_audio(sink: &Sink) {
     sink.pause();
 }
 
-// Function to stop the audio playback
+
 fn stop_audio(sink: &Sink) {
     sink.stop();
 }
 
 
 fn delete_wav_files() -> io::Result<()> {
-    // Get the current directory
     let current_dir = std::env::current_dir()?;
 
-    // Read the directory entries
     let entries = fs::read_dir(current_dir)?;
 
     for entry in entries {
@@ -865,7 +1021,6 @@ fn delete_wav_files() -> io::Result<()> {
             let file_path = entry.path();
             if let Some(extension) = file_path.extension() {
                 if extension == "wav" {
-                    // Delete the file
                     fs::remove_file(file_path)?;
                 }
             }
