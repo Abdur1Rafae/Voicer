@@ -4,7 +4,7 @@
 use std::{fs::{self, File}, path::Path, vec};
 use chrono::{DateTime, Utc, TimeZone};
 pub use eframe::{run_native, egui, App};
-use egui::Ui;
+use egui::{Ui, Color32};
 use crate::db_config::{self, Users, publicUser, get_user_by_username, find_users_by_names};
 use mongodb::{Client, Collection  , Database};
 use mongodb::bson::{self,oid::ObjectId};
@@ -15,6 +15,11 @@ use rodio::{OutputStream, Sink, source::Buffered};
 use std::{process::Command};
 use db_config::{connect_to_mongodb, VoiceNote};
 use record_audio::audio_clip::AudioClip as ac;
+use egui::TextStyle;
+use egui::RichText;
+use egui::widgets::Button;
+//use egui::WidgetText::RichText;
+
 
 
 enum Page {
@@ -26,8 +31,6 @@ enum Page {
     FollowerPost,
     Conversation
 }
-
-
 pub struct Gui {
     current_page: Page,
     error_message: Option<String>,
@@ -41,6 +44,8 @@ pub struct Gui {
     userid: ObjectId,
     conversation: Option<db_config::conversation>,
     theme: Theme,
+    window_style: egui::Style,
+
 }
 
 // Define an enum to represent the current theme/mode
@@ -61,11 +66,13 @@ impl Gui {
         match self.theme {
             Theme::Dark => {
                 self.theme = Theme::Light;
-                ctx.set_visuals(egui::Visuals::light());
+                //ctx.set_visuals(egui::Visuals::light());
+            
             }
             Theme::Light => {
                 self.theme = Theme::Dark;
-                ctx.set_visuals(egui::Visuals::dark());
+                //ctx.set_visuals(egui::Visuals::dark());
+
             }
         }
     }
@@ -84,9 +91,9 @@ impl Gui {
             userslist : ObjectId::new(),
             userid: ObjectId::new(),
             conversation: None,
-        }
+            window_style: egui::Style::default(),  
     }
-
+    }
 
 // Function to show the signup page UI
 fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
@@ -107,6 +114,7 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
             });
         }
         );});
+
 
     ui.vertical_centered(|ui| {
             // Group the contents of the signup page
@@ -222,9 +230,9 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         ui.vertical_centered(|ui|{
             ui.add_space(10.0);
             ui.heading("Login");
+            ui.label(RichText::new(("Test")).color(egui::Color32::DARK_RED));
             ui.add_space(10.0);
-            
-
+            ui.add(egui::Button::new("Test").fill(Color32::RED)).clicked();
         });
         ui.vertical_centered(|ui| {
             // Group the contents of the signup page
@@ -271,7 +279,7 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                 ui.add_space(5.0);
                 ui.horizontal(|ui| {
                 ui.add_space(558.0);
-                    if ui.button("Log in").clicked() {
+                    if ui.button(RichText::new("Log in")).clicked() {
      
                     let rt= Runtime::new().unwrap();
                     let username= self.username.clone();
@@ -749,6 +757,7 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
             self.current_page=Page::Home;
         }
         if ui.button("Back").clicked() {
+            
             self.current_page = Page::Home;
         }
             
@@ -760,6 +769,8 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
 impl App for Gui {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
+            self.window_style.visuals.override_text_color = Some(egui::Color32::from_rgb(200, 200, 200));            
+            
             match self.current_page {
                 Page::Signup => {
                     self.signup_page(ctx, ui);
