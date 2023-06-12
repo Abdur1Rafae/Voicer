@@ -568,6 +568,23 @@ async fn get_all_following(user_collection: Collection<Users> , user_id: ObjectI
     following
 }
 
+async fn get_all_followers(user_collection: Collection<Users> , user_id: ObjectId) -> Vec<ObjectId> {
+    let filter = doc! {"_id": user_id};
+    let mut cursor = user_collection.find(filter, None).await.expect("Failed to execute find.");
+    let mut followers = Vec::new();
+
+    while let Some(result) = cursor.next().await {
+        if let Ok(user) = result {
+            for i in user.followers {
+                followers.push(i);
+            }
+        }        
+    }
+    
+
+    followers
+}
+
 pub async fn get_all_following_profile(user_collection: Collection<Users>, user_id: ObjectId) -> Vec<publicUser> {
     let following_ids = get_all_following(user_collection.clone(), user_id.clone()).await;
     let mut users =Vec::new();
@@ -599,6 +616,50 @@ pub async fn get_all_following_profile(user_collection: Collection<Users>, user_
     users
 }
 
+pub async fn get_all_followers_profile(user_collection: Collection<Users>, user_id: ObjectId) -> Vec<publicUser> {
+    let follower_ids = get_all_followers(user_collection.clone(), user_id.clone()).await;
+
+    let mut users =Vec::new();
+    let mut var=0;
+
+    for i in 0..follower_ids.len() {
+        let filter = doc! { "_id": follower_ids[i] };
+        let mut cursor = user_collection.find(filter, None).await.expect("Failed to execute find.");
+        while let Some(result) = cursor.next().await {
+            if let Ok(user) = result {
+                if user._id != user_id {
+                    let pub_user = publicUser {
+                        refNo: var,
+                        _id: user._id,
+                        username: user.username,
+                        name: user.name,
+                        description: user.description,
+                        followers: user.followers,
+                        following: user.following,
+                        voice_notes: user.voice_notes,
+                    };
+                    users.push(pub_user);
+                    var= var+1;
+                }
+            }
+        }
+    }
+    users
+}
+
+pub async fn remove_follower(user_collection: Collection<Users>, user_id: ObjectId, follower_id: ObjectId) -> Vec<publicUser> {
+    let filter = doc! {"_id": user_id};
+    let update = doc! { "$pull": { "followers": follower_id.to_hex() } };
+    let options = UpdateOptions::builder().build();
+    let result = user_collection.update_one(filter, update, options).await;
+
+    let filter2 = doc!{"_id": follower_id};
+    let update2 = doc! {"$pull" : {"following": user_id.to_hex() } };
+    let options2 = UpdateOptions::builder().build();
+    let result2 = user_collection.update_one(filter2, update2, options2).await;
+    
+    get_all_followers_profile(user_collection, user_id).await
+}
 
 pub async fn get_all_voice_ids_from_following(user_collection:Collection<Users> , voice_collection:Collection<VoiceNote> , user_id:ObjectId) -> Vec<VoiceNote>{
     let following = get_all_following(user_collection.clone(), user_id).await;

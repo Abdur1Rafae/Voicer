@@ -31,6 +31,7 @@ enum Page {
     Conversation,
     UserProfile,
     Following,
+    Followers
 }
 pub struct Gui {
     current_page: Page,
@@ -46,6 +47,7 @@ pub struct Gui {
     conversation: Option<backend::conversation>,
     theme: Theme,
     following: Option<Vec<backend::publicUser>>,
+    followers: Option<Vec<backend::publicUser>>,
     window_style: egui::Style,
 }
 
@@ -92,6 +94,7 @@ impl Gui {
             user: None,
             conversation: None,
             following: None,
+            followers: None,
             window_style: egui::Style::default(),  
         }
     }
@@ -478,7 +481,7 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
                                 let mut reaction = backend::ReactionType::SpeakUp;
                                 ui.group(|ui| {
                                     ui.horizontal(|ui| {
-                                        if ui.add(egui::Button::new("Shut Up").fill(Color32::LIGHT_RED)).clicked() {
+                                        if ui.add(egui::Button::new(RichText::new(("Shut Up")).color(egui::Color32::WHITE)).fill(Color32::LIGHT_RED)).clicked() {
                                             reaction = backend::ReactionType::ShutUp;
                                             let rt= Runtime::new().unwrap();
                                             let (response) = rt.block_on( async move
@@ -494,7 +497,7 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
                                                 }
                                             );
                                         }
-                                        if ui.add(egui::Button::new("Speak Up").fill(Color32::LIGHT_GREEN)).clicked() {
+                                        if ui.add(egui::Button::new(RichText::new(("Speak Up")).color(egui::Color32::WHITE)).fill(Color32::LIGHT_GREEN)).clicked() {
                                             reaction = backend::ReactionType::SpeakUp;
                                             let rt= Runtime::new().unwrap();
                                             let (response) = rt.block_on( async move
@@ -510,7 +513,7 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
                                                 }
                                             );
                                         }
-                                        if ui.add(egui::Button::new("Reply").fill(Color32::LIGHT_BLUE)).clicked() {
+                                        if ui.add(egui::Button::new(RichText::new(("Reply")).color(egui::Color32::WHITE)).fill(Color32::LIGHT_BLUE)).clicked() {
                                             let rt= Runtime::new().unwrap();
                                             let (response) = rt.block_on( async move
                                                 {
@@ -824,7 +827,20 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         let following_count = your_info.following.len();
         
         if ui.add(egui::Button::new(format!("Followers: {}", followers_count))).clicked() {
-
+            let rt= Runtime::new().unwrap();
+            let (userlistr) = rt.block_on( async move
+                {
+                    let response = tokio::spawn
+                    ( async move
+                        {
+                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                            backend::get_all_followers_profile(user_collection, your_info._id).await
+                        }
+                    ).await.unwrap();
+                    response
+                });
+            self.followers = Some(userlistr);
+            self.current_page=Page::Followers;
         };
 
         if ui.add(egui::Button::new(format!("Following: {}", following_count))).clicked() {
@@ -858,7 +874,7 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                             let x = play_audio(&filename);
                         }
                         let post = your_info.voice_notes[i].clone();
-                        if ui.button("Delete").clicked() {
+                        if ui.add(egui::Button::new(RichText::new(("Delete")).color(egui::Color32::WHITE)).fill(Color32::RED)).clicked() {
                             let rt= Runtime::new().unwrap();
                             let (userlistr) = rt.block_on( async move
                                 {
@@ -898,7 +914,7 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                     ui.label(format!("Followers: {}", user.followers.len()));
                     ui.label(format!("Following: {}", user.following.len()));
                     
-                    if ui.button("Unfollow").clicked() {
+                    if ui.add(egui::Button::new(RichText::new(("Unfollow")).color(egui::Color32::RED))).clicked() {
                         let mut myuser=self.user.clone().unwrap()._id;
                         let mut following=user._id.clone();
                         let rt= Runtime::new().unwrap();
@@ -909,6 +925,47 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                                         {
                                             let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
                                             backend::unfollow(user_collection.clone(), myuser, following).await
+                                        }
+                                    ).await.unwrap();
+                                    response
+                                });
+                        self.following = Some(userlistr);
+                        ui.label(format!("Successfull"));
+                    }
+                });
+            }
+        });
+        if ui.button("Back").clicked() {
+            self.current_page = Page::Home;
+        } 
+    }
+
+    fn followers_profiles_display(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
+        ui.label(format!("You are followed by: "));
+        let mut followerList = self.followers.clone().unwrap();
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            for i in 0..followerList.len(){
+                ui.add_space(15.0);
+                ui.group(|ui|{
+                    let user = followerList[i].clone();
+                    ui.label(format!("Name:\t\t\t{}", user.name));
+                    ui.label(format!("Username:\t{}", user.username));
+                    ui.label(format!("Bio:       {}", user.description));
+                    ui.label(format!("Quotes:\t\t{}", user.voice_notes.len()));
+                    ui.label(format!("Followers: {}", user.followers.len()));
+                    ui.label(format!("Following: {}", user.following.len()));
+                    
+                    if ui.add(egui::Button::new(RichText::new(("Remove")).color(egui::Color32::WHITE)).fill(Color32::RED)).clicked() {
+                        let mut myuser=self.user.clone().unwrap()._id;
+                        let mut follower=user._id.clone();
+                        let rt= Runtime::new().unwrap();
+                            let (userlistr) = rt.block_on( async move
+                                {
+                                    let response = tokio::spawn
+                                    ( async move
+                                        {
+                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                            backend::remove_follower(user_collection.clone(), myuser, follower).await
                                         }
                                     ).await.unwrap();
                                     response
@@ -959,6 +1016,9 @@ impl App for Gui {
                 },
                 Page::Following => {
                     self.following_profiles_display(ctx, ui);
+                },
+                Page::Followers => {
+                    self.followers_profiles_display(ctx, ui);
                 }
             }
         });
