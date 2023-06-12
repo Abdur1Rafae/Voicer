@@ -1,7 +1,10 @@
+
+
+
 use std::{fs::{self, File}, path::Path, vec};
 use chrono::{DateTime, Utc, TimeZone};
-use eframe::{run_native, epi::App, egui::{self}};
-use self::egui::color;
+pub use eframe::{run_native, egui, App};
+use egui::Ui;
 use crate::db_config::{self, Users, publicUser, get_user_by_username, find_users_by_names};
 use mongodb::{Client, Collection  , Database};
 use mongodb::bson::{self,oid::ObjectId};
@@ -10,7 +13,6 @@ use tokio;
 use std::io::BufReader;
 use rodio::{OutputStream, Sink, source::Buffered};
 use std::{process::Command};
-
 use db_config::{connect_to_mongodb, VoiceNote};
 use record_audio::audio_clip::AudioClip as ac;
 
@@ -55,7 +57,7 @@ impl Default for Theme {
 
 
 impl Gui {
-    fn toggle_theme(&mut self, ctx: &egui::CtxRef) {
+    fn toggle_theme(&mut self, ctx: &egui::Context) {
         match self.theme {
             Theme::Dark => {
                 self.theme = Theme::Light;
@@ -87,11 +89,12 @@ impl Gui {
 
 
 // Function to show the signup page UI
-fn signup_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
+fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
     let mut password_visible = true;
     ui.vertical_centered(|ui| {
         ui.add_space(10.0);
         ui.heading("Sign up");
+
         ui.add_space(10.0);
     });
     ui.vertical_centered(|ui| {
@@ -186,7 +189,7 @@ fn signup_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
                 }
                 if let Some(error_message) = &self.error_message {
                     // Display error message if it exists
-                    ui.add(egui::Label::new(error_message).text_color(egui::Color32::RED));
+                    ui.add(egui::Label::new(error_message));
                 }});
                 ui.add_space(20.0);
                 ui.horizontal(|ui| {
@@ -215,7 +218,7 @@ fn signup_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
         
     }
     // Function to show the login page UI
-    fn login_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
+    fn login_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         ui.vertical_centered(|ui|{
             ui.add_space(10.0);
             ui.heading("Login");
@@ -234,7 +237,7 @@ fn signup_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
             }
             );});
         
-        ui.add(egui::Label::new("Enter  your Voicer account details:").heading());
+        ui.add(egui::Label::new("Enter  your Voicer account details:"));
         ui.add_space(5.0);
         // Group the contents of the login page
         ui.vertical_centered(|ui| {
@@ -312,30 +315,30 @@ fn signup_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
         });
 
 
-        if let Some(error_message) = &self.error_message {
-            // Display error message if it exists
-            ui.add(egui::Label::new(error_message).text_color(egui::Color32::RED));
-        }
-        ui.vertical(|ui|{
-                ui.add_space(10.0);
-    
-    
-            });
-        ui.horizontal(|ui| {
-                ui.label("Don't have an account?");
-                if ui.button("Sign up").clicked() {
-                    self.error_message = None;
-                    self.username.clear();
-                    self.password.clear();
-                    self.current_page = Page::Signup;
-                    self.userslist= ObjectId::new();
-                    self.voicenote_vec= None;
-                    self.followuser.clear();
-                    self.email.clear();
-                    self.userid= ObjectId::new();
-                    self.conversation= None; 
+                if let Some(error_message) = &self.error_message {
+                    // Display error message if it exists
+                    ui.add(egui::Label::new(error_message));
                 }
-            });
+            ui.vertical(|ui|{
+                    ui.add_space(10.0);
+        
+        
+                });
+            ui.horizontal(|ui| {
+                    ui.label("Don't have an account?");
+                    if ui.button("Sign up").clicked() {
+                        self.error_message = None;
+                        self.username.clear();
+                        self.password.clear();
+                        self.current_page = Page::Signup;
+                        self.userslist= ObjectId::new();
+                        self.voicenote_vec= None;
+                        self.followuser.clear();
+                        self.email.clear();
+                        self.userid= ObjectId::new();
+                        self.conversation= None; 
+                    }
+                });
             
     ;}
 
@@ -344,7 +347,7 @@ fn signup_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
 
 
 // Function to show the home page UI
-fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
+fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
     let folder_name = format!("{}", self.userid);
     fs::create_dir_all(&folder_name).unwrap(); 
     ui.heading("Voicer Home Page");
@@ -419,7 +422,7 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
     ui.add_space(10.0);
 
     let mut vec_vc = self.voicenote_vec.clone();
-    egui::ScrollArea::auto_sized().show(ui, |ui| {
+    egui::ScrollArea::vertical().show(ui, |ui| {
         let userid = self.userid.clone();
         if let Some(vec_vc) = vec_vc{
             let voice = vec_vc;
@@ -495,8 +498,6 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
                             }
                         });
                     });
-
-                    
                 });
             }
         }
@@ -505,7 +506,7 @@ fn home_page(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui) {
     ui.add_space(10.0);
 }
 
-fn conversation(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui){
+fn conversation(&mut self, ctx: &egui::Context, ui: &mut egui::Ui){
     ui.heading("Conversation");
     ui.add_space(10.0);
     let folder_name = format!("{}", self.userid);
@@ -559,7 +560,7 @@ fn conversation(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui){
 
     let mut reply_count = reply.replies.len();
 
-    egui::ScrollArea::auto_sized().show(ui, |ui| {
+    egui::ScrollArea::vertical().show(ui, |ui| {
     let voice_obj = reply.clone().replies;
     // Display voicenote posts
     for i in 0..reply_count {
@@ -616,10 +617,10 @@ fn conversation(&mut self, ctx: &egui::CtxRef, ui: &mut egui::Ui){
 
             
         });
-    }})
+    }});
 }
 
-fn tweet_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
+fn tweet_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
     let column_width = ui.available_width();
     let folder_name = format!("{}", self.userid);
     fs::create_dir_all(&folder_name).unwrap();
@@ -680,7 +681,7 @@ fn tweet_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
 
     }
     // Function to show the Shared Files page UI
-fn FollowPage(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
+fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         let mut userlist: Vec<publicUser> = Vec::new();
         ui.heading("Follow a Voicer User");
         ui.add_space(10.0);
@@ -724,7 +725,7 @@ fn FollowPage(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
         
     }
         // Function to show the Shared Files page UI
-    fn follow_user_page(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
+    fn follow_user_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
 
         ui.label(format!("User ID: {}", self.userslist));
         
@@ -757,7 +758,7 @@ fn FollowPage(&mut self, _ctx: &egui::CtxRef, ui: &mut egui::Ui) {
 
 
 impl App for Gui {
-    fn update(&mut self, ctx: &egui::CtxRef, _frame: &mut eframe::epi::Frame<'_>) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             match self.current_page {
                 Page::Signup => {
@@ -785,9 +786,6 @@ impl App for Gui {
         });
     }
 
-    fn name(&self) -> &str {
-        "Voicer"
-    }
 }
 
 // Function to count the number of .wav files in the main directory
