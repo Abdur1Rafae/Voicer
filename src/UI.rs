@@ -48,7 +48,6 @@ pub struct Gui {
 
 }
 
-// Define an enum to represent the current theme/mode
 enum Theme {
     Dark,
     Light,
@@ -56,7 +55,7 @@ enum Theme {
 
 impl Default for Theme {
     fn default() -> Self {
-        Theme::Light // Set the default theme/mode to dark
+        Theme::Light
     }
 }
 
@@ -66,12 +65,12 @@ impl Gui {
         match self.theme {
             Theme::Dark => {
                 self.theme = Theme::Light;
-                //ctx.set_visuals(egui::Visuals::light());
+                ctx.set_visuals(egui::Visuals::light());
             
             }
             Theme::Light => {
                 self.theme = Theme::Dark;
-                //ctx.set_visuals(egui::Visuals::dark());
+                ctx.set_visuals(egui::Visuals::dark());
 
             }
         }
@@ -95,7 +94,7 @@ impl Gui {
     }
     }
 
-// Function to show the signup page UI
+
 fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
     let mut password_visible = true;
     ui.vertical_centered(|ui| {
@@ -105,7 +104,7 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         ui.add_space(10.0);
     });
     ui.vertical_centered(|ui| {
-        // Group the contents of the signup page
+
         ui.vertical_centered(|ui|{
 
             ui.add_space(50.0);
@@ -117,29 +116,29 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
 
 
     ui.vertical_centered(|ui| {
-            // Group the contents of the signup page
+
             ui.group(|ui| {
                 ui.vertical_centered(|ui| {
-                    // Group the contents of the signup page
+
                     ui.vertical_centered(|ui|{
             
                         ui.add_space(10.0);
                     }
                     );});
-                // Calculate available width for each column
+
                 let column_width = ui.available_width();
                 ui.horizontal(|ui| {
                     ui.add_space(200.0);
                     ui.label("Username: ");
                     let current_width = ui.available_width();
-                    ui.add_space(310.0 - (column_width - current_width)); // Add spacing between the heading and the buttons
+                    ui.add_space(310.0 - (column_width - current_width)); 
                     ui.text_edit_singleline(&mut self.username);
                 });
                 ui.horizontal(|ui| {
                     ui.add_space(200.0);
                     ui.label("Email: ");
                     let current_width = ui.available_width();
-                    ui.add_space(310.0 - (column_width - current_width)); // Add spacing between the label and the text edit
+                    ui.add_space(310.0 - (column_width - current_width)); 
                     ui.text_edit_singleline(&mut self.email);
                 });
                 ui.horizontal(|ui| {
@@ -257,7 +256,8 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
             
                         ui.add_space(10.0);
                     }
-                    );});
+                    );
+                });
                 // Calculate available width for each column
                 let column_width = ui.available_width();
             
@@ -278,42 +278,34 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                 });
                 ui.add_space(5.0);
                 ui.horizontal(|ui| {
-                ui.add_space(558.0);
+                    ui.add_space(558.0);
                     if ui.button(RichText::new("Log in")).clicked() {
-     
-                    let rt= Runtime::new().unwrap();
-                    let username= self.username.clone();
-                    let pass= self.password.clone();
-                    let (response) = rt.block_on( async move
-                        {
-                            let response = tokio::spawn
-                            ( async move
-                                {
-                                    let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                    let response = db_config::get_user_by_username(user_collection.clone(), username, pass).await;
-                                    let user_iddd= response.unwrap()._id.clone();
-                                    let response2 = db_config::get_all_voice_ids_from_following(user_collection ,voice_note_collection , user_iddd).await;
-            
-                                    (user_iddd,response2)
-                                }
-                            ).await.unwrap();
-                            response
-                        });
-    
-                    self.userid = response.0.clone();
-                    self.voicenote_vec = Some(response.1.clone());
-                    println!("login successful : {:?}",response.0.clone() );
-    
-                    self.current_page = Page::Home;
-                    }
-                    });
-                    ui.add_space(5.0);
-                    ui.horizontal(|ui| {
-                        ui.add_space(750.0);
-                        ui.label("");
-                        
-                    });
+        
+                        let rt= Runtime::new().unwrap();
+                        let username= self.username.clone();
+                        let pass= self.password.clone();
+                        let (response) = rt.block_on( async move
+                            {
+                                let response = tokio::spawn
+                                ( async move
+                                    {
+                                        let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                        let response = db_config::get_user_by_username(user_collection.clone(), username, pass).await;
+                                        let user_iddd= response.unwrap()._id.clone();
+                                        let response2 = db_config::get_all_voice_ids_from_following(user_collection ,voice_note_collection , user_iddd).await;
+                
+                                        (user_iddd,response2)
+                                    }
+                                ).await.unwrap();
+                                response
+                            });
 
+                        self.userid = response.0.clone();
+                        self.voicenote_vec = Some(response.1.clone());
+                        println!("login successful : {:?}",response.0.clone() );
+                        self.current_page = Page::Home;
+                    }
+                });
             });
             
         });
@@ -322,33 +314,30 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
             ui.add_space(5.0);
         });
 
+        if let Some(error_message) = &self.error_message {
+            ui.add(egui::Label::new(error_message));
+        }
+        ui.vertical(|ui|{
+            ui.add_space(10.0);
+        });
 
-                if let Some(error_message) = &self.error_message {
-                    // Display error message if it exists
-                    ui.add(egui::Label::new(error_message));
-                }
-            ui.vertical(|ui|{
-                    ui.add_space(10.0);
-        
-        
-                });
-            ui.horizontal(|ui| {
-                    ui.label("Don't have an account?");
-                    if ui.button("Sign up").clicked() {
-                        self.error_message = None;
-                        self.username.clear();
-                        self.password.clear();
-                        self.current_page = Page::Signup;
-                        self.userslist= ObjectId::new();
-                        self.voicenote_vec= None;
-                        self.followuser.clear();
-                        self.email.clear();
-                        self.userid= ObjectId::new();
-                        self.conversation= None; 
-                    }
-                });
+        ui.horizontal(|ui| {
+            ui.label("Don't have an account?");
+            if ui.button("Sign up").clicked() {
+                self.error_message = None;
+                self.username.clear();
+                self.password.clear();
+                self.current_page = Page::Signup;
+                self.userslist= ObjectId::new();
+                self.voicenote_vec= None;
+                self.followuser.clear();
+                self.email.clear();
+                self.userid= ObjectId::new();
+                self.conversation= None; 
+            }
+        });
             
-    ;}
+    }
 
     
 
@@ -356,8 +345,6 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
 
 // Function to show the home page UI
 fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
-    let folder_name = format!("{}", self.userid);
-    fs::create_dir_all(&folder_name).unwrap(); 
     ui.heading("Voicer Home Page");
     ui.add_space(10.0);
     ui.label(format!("Welcome, {}!", self.username)); // Display welcome message with user's name
@@ -369,7 +356,7 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
     ui.add_space(10.0);
 
     ui.horizontal(|ui| {
-        ui.add_space(300.0);
+        ui.add_space(445.0);
         if ui.button("▶️ Play All").clicked() {
             // Play all voicenote files
             let directory = ".";
@@ -428,6 +415,8 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
     });
 
     ui.add_space(10.0);
+    
+    
 
     let mut vec_vc = self.voicenote_vec.clone();
     egui::ScrollArea::vertical().show(ui, |ui| {
@@ -437,74 +426,85 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
             // Display voicenote posts
             for i in 0..voicenote_count {
                 let voice_obj = voice[i].clone();
-                ui.group(|ui| {
-                    ui.label(format!("Voicenote {} by {}",i+1, voice_obj.name));
-
-                    ui.horizontal(|ui| {
-                        if ui.button("▶️ Play").clicked() {
-                            let filename = voice_obj._id.to_hex()+".wav";
-                            let x = play_audio(&filename);
-                        }
-                    });
-
-                    let time = Utc.timestamp(voice_obj.timestamp.timestamp(), 0);
-                    let formatted_time = time.format("%Y-%m-%d %H:%M:%S").to_string();
-
-                    ui.label(format!("Posted on: {}", formatted_time));
-                    let mut reaction = db_config::ReactionType::SpeakUp;
+                ui.horizontal(|ui|{
+                    ui.add_space(350.0);
                     ui.group(|ui| {
-                        ui.horizontal(|ui| {
-                            if ui.button("Shut Up").clicked() {
-                                reaction = db_config::ReactionType::ShutUp;
-                                let rt= Runtime::new().unwrap();
-                                let (response) = rt.block_on( async move
-                                    {
-                                        let response = tokio::spawn
-                                        ( async move
-                                            {
-                                                let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                                db_config::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
-                                            }
-                                        ).await.unwrap();
-                                        response
+                        ui.horizontal(|ui|{
+                            ui.add_space(150.0);
+                            ui.vertical(|ui|{
+                                ui.label(format!("Voicenote {} by {}",i+1, voice_obj.name));
+    
+                                ui.horizontal(|ui| {
+                                    ui.add_space(75.0);
+                                    if ui.add(egui::Button::new("▶️ Play").fill(Color32::TRANSPARENT)).clicked() {
+                                        let filename = voice_obj._id.to_hex()+".wav";
+                                        let x = play_audio(&filename);
                                     }
-                                );
-                            }
-                            if ui.button("Speak Up").clicked() {
-                                reaction = db_config::ReactionType::SpeakUp;
-                                let rt= Runtime::new().unwrap();
-                                let (response) = rt.block_on( async move
-                                    {
-                                        let response = tokio::spawn
-                                        ( async move
-                                            {
-                                                let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                                db_config::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
-                                            }
-                                        ).await.unwrap();
-                                        response
-                                    }
-                                );
-                            }
-                            if ui.button("Conversation").clicked() {
-                                let rt= Runtime::new().unwrap();
-                                let (response) = rt.block_on( async move
-                                    {
-                                        let response = tokio::spawn
-                                        ( async move
-                                            {
-                                                let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
-                                                let replies = db_config::create_conversation(voice_note_collection, voice_obj._id).await;
-                        
-                                                (replies)
-                                            }
-                                        ).await.unwrap();
-                                        response
+                                });
+            
+                                let time = Utc.timestamp(voice_obj.timestamp.timestamp(), 0);
+                                let formatted_time = time.format("%Y-%m-%d %H:%M:%S").to_string();
+            
+                                ui.label(format!("Posted on: {}", formatted_time));
+                                let mut reaction = db_config::ReactionType::SpeakUp;
+                                ui.group(|ui| {
+                                    ui.horizontal(|ui| {
+                                        if ui.add(egui::Button::new("Shut Up").fill(Color32::LIGHT_RED)).clicked() {
+                                            reaction = db_config::ReactionType::ShutUp;
+                                            let rt= Runtime::new().unwrap();
+                                            let (response) = rt.block_on( async move
+                                                {
+                                                    let response = tokio::spawn
+                                                    ( async move
+                                                        {
+                                                            let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                                            db_config::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
+                                                        }
+                                                    ).await.unwrap();
+                                                    response
+                                                }
+                                            );
+                                        }
+                                        if ui.add(egui::Button::new("Speak Up").fill(Color32::LIGHT_GREEN)).clicked() {
+                                            reaction = db_config::ReactionType::SpeakUp;
+                                            let rt= Runtime::new().unwrap();
+                                            let (response) = rt.block_on( async move
+                                                {
+                                                    let response = tokio::spawn
+                                                    ( async move
+                                                        {
+                                                            let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                                            db_config::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
+                                                        }
+                                                    ).await.unwrap();
+                                                    response
+                                                }
+                                            );
+                                        }
+                                        if ui.add(egui::Button::new("Reply").fill(Color32::LIGHT_BLUE)).clicked() {
+                                            let rt= Runtime::new().unwrap();
+                                            let (response) = rt.block_on( async move
+                                                {
+                                                    let response = tokio::spawn
+                                                    ( async move
+                                                        {
+                                                            let (user_collection, voice_note_collection, db, client) = db_config::connect_to_mongodb().await;
+                                                            let replies = db_config::create_conversation(voice_note_collection, voice_obj._id).await;
+                                    
+                                                            (replies)
+                                                        }
+                                                    ).await.unwrap();
+                                                    response
+                                                });
+                                            self.conversation = Some(response);
+                                            self.current_page= Page::Conversation;
+                                        }
                                     });
-                                self.conversation = Some(response);
-                                self.current_page= Page::Conversation;
-                            }
+                                });
+                            });
+                            ui.add_space(150.0);
                         });
+                        
                     });
                 });
             }
