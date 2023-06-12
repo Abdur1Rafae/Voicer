@@ -18,7 +18,6 @@ use record_audio::audio_clip::AudioClip as ac;
 use egui::TextStyle;
 use egui::RichText;
 use egui::widgets::Button;
-//use egui::WidgetText::RichText;
 
 
 
@@ -34,7 +33,7 @@ enum Page {
 pub struct Gui {
     current_page: Page,
     error_message: Option<String>,
-    userslist: ObjectId,
+    userslist: Option<db_config::publicUser>,
     voicenote_vec: Option<Vec<db_config::VoiceNote>>,
     username: String,
     followuser: String,
@@ -87,7 +86,7 @@ impl Gui {
             confirm_pass: String::new(),
             theme: Theme::default(),
             voicenote_vec: None,
-            userslist : ObjectId::new(),
+            userslist : None,
             userid: ObjectId::new(),
             conversation: None,
             window_style: egui::Style::default(),  
@@ -328,7 +327,7 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                 self.username.clear();
                 self.password.clear();
                 self.current_page = Page::Signup;
-                self.userslist= ObjectId::new();
+                self.userslist= None;
                 self.voicenote_vec= None;
                 self.followuser.clear();
                 self.email.clear();
@@ -407,7 +406,7 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
             self.error_message = None;
             self.username.clear();
             self.password.clear();
-            self.userslist= ObjectId::new();
+            self.userslist= None;
             self.voicenote_vec= None;
 
             self.current_page = Page::Login;
@@ -721,7 +720,7 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                             response
                         });
 
-                self.userslist=userlistr;
+                self.userslist=Some(userlistr);
                 self.current_page=Page::FollowerPost;
                          
                
@@ -735,11 +734,19 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         // Function to show the Shared Files page UI
     fn follow_user_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
 
-        ui.label(format!("User ID: {}", self.userslist));
+        ui.label(format!("User Profile"));
+        ui.add_space(15.0);
+        let user = self.userslist.clone().unwrap();
+        ui.label(format!("Name:\t\t\t{}", user.name));
+        ui.label(format!("Username:\t{}", user.username));
+        ui.label(format!("Bio:       {}", user.description));
+        ui.label(format!("Quotes:\t\t{}", user.voice_notes.len()));
+        ui.label(format!("Followers: {}", user.followers.len()));
+        ui.label(format!("Following: {}", user.following.len()));
         
         if ui.button("Follow").clicked() {
             let mut myuser=self.userid;
-            let mut myfol=self.userslist;
+            let mut myfol=self.userslist.clone().unwrap()._id;
             let rt= Runtime::new().unwrap();
                 let (userlistr) = rt.block_on( async move
                     {

@@ -52,7 +52,7 @@ pub struct VoiceNote {
     #[serde(with = "chrono::serde::ts_seconds")]
     pub timestamp: DateTime<Utc>,
 }
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct publicUser{
     pub refNo: i32,
     pub _id: ObjectId,
@@ -95,11 +95,21 @@ pub async fn connect_to_mongodb() -> (Collection<Users>, Collection<VoiceNote>, 
     (collection, vcollection, db , client)
 }
 
-pub async fn find_users_by_names(user_collection: Collection<Users> , username: &str, user_id: ObjectId) -> ObjectId {
+pub async fn find_users_by_names(user_collection: Collection<Users> , username: &str, user_id: ObjectId) -> publicUser {
     let filter = doc! {"username": username};
     let mut cursor = user_collection.find(filter, None).await.expect("Failed to execute find.");
-    let mut users = ObjectId::new();
+    let mut users = publicUser{
+        refNo:0,
+        _id: ObjectId::new(),
+        username: String::new(),
+        name: String::new(),
+        description: String::new(),
+        followers: Vec::new(),
+        following: Vec::new(),
+        voice_notes: Vec::new(),
+    };
     let mut var=0;
+
     while let Some(result) = cursor.next().await {
         if let Ok(user) = result {
             if user._id != user_id {
@@ -113,7 +123,7 @@ pub async fn find_users_by_names(user_collection: Collection<Users> , username: 
                     following: user.following,
                     voice_notes: user.voice_notes,
                 };
-                users=user._id;
+                users = pub_user;
                 var= var+1;
             }
         }
