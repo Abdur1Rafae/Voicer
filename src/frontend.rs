@@ -228,7 +228,7 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
     fn login_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         ui.vertical_centered(|ui|{
             ui.add_space(10.0);
-            ui.label(RichText::new(("LOGIN")).color(egui::Color32::WHITE));
+            ui.label(RichText::new(("LOGIN")));
             //ui.label(RichText::new(("Test")).color(egui::Color32::DARK_RED));
             ui.add_space(10.0);
             //ui.add(egui::Button::new("Test").fill(Color32::RED)).clicked();
@@ -243,7 +243,7 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                 });
             }
             );});
-        ui.label(RichText::new(("Enter  your Voicer account details:")).color(egui::Color32::WHITE));
+        ui.label(RichText::new(("Enter  your Voicer account details:")));
         ui.add_space(5.0);
         ui.vertical_centered(|ui| {
             ui.group(|ui| {
@@ -258,7 +258,7 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
             
                 ui.horizontal(|ui| {
                     ui.add_space(200.0);
-                    ui.label(RichText::new(("Username:")).color(egui::Color32::WHITE));
+                    ui.label(RichText::new(("Username:")));
                     let current_width = ui.available_width();
                     ui.add_space(310.0 - (column_width - current_width)); 
                     ui.text_edit_singleline(&mut self.username);
@@ -266,7 +266,7 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
 
                 ui.horizontal(|ui| {
                     ui.add_space(200.0);
-                    ui.label(RichText::new(("Password:")).color(egui::Color32::WHITE));
+                    ui.label(RichText::new(("Password:")));
                     let current_width = ui.available_width();
                     ui.add_space(310.0-(column_width-current_width));   
                     ui.add(egui::TextEdit::singleline(&mut self.password).password(true));
@@ -274,7 +274,7 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                 ui.add_space(5.0);
                 ui.horizontal(|ui| {
                     ui.add_space(558.0);
-                    if ui.add(egui::Button::new("Login").fill(Color32::DARK_GRAY)).clicked(){
+                    if ui.add(egui::Button::new("Login").fill(Color32::LIGHT_GRAY)).clicked(){
         
                         let runtime= Runtime::new().unwrap();
                         let username= self.username.clone();
@@ -318,8 +318,8 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         });
 
         ui.horizontal(|ui| {
-            ui.label(RichText::new(("Don't have an account?")).color(egui::Color32::WHITE));
-            if ui.add(egui::Button::new("Sign up").fill(Color32::DARK_GRAY)).clicked(){
+            ui.label(RichText::new(("Don't have an account?")));
+            if ui.add(egui::Button::new("Sign up").fill(Color32::LIGHT_BLUE)).clicked(){
                 self.error_message = None;
                 self.username.clear();
                 self.password.clear();
