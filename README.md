@@ -9,6 +9,7 @@ Project Idea: A twitter-like social media application built purely on rust libra
 Database used: MongoDB
 Collections: Users and VoiceNotes
 
+
 The project is a working social media app with simple and straight-forward UI built on egui and eframe. Users will be able to perform all of the following tasks:
 1) Sign Up / Login
 2) Record / Delete their Quotes
@@ -24,3 +25,6 @@ Automatic directory cleaning: All downloaded quotes in a user session gets delet
 Utilised Structs and vectors of those Structs to post and fetch data from mongoDB. 
 Created Enums to restrict options in scenarios like reactions to a tweet and switching between pages on frontend.
 Managed Error Handling using Rust's enums: Option and Result.
+
+# CLI Component
+A CLI based component written to match the recording library used which requires a CLI based input to stop recording.
