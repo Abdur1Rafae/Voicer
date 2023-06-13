@@ -7,6 +7,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::io;
 use futures_util::StreamExt;
+use dotenv::dotenv;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Users {
@@ -88,7 +89,8 @@ pub struct conversation{
 }
 
 pub async fn connect_to_mongodb() -> (Collection<Users>, Collection<VoiceNote>, Database, Client) {
-    let client = Client::with_uri_str("mongodb+srv://RustUser:RUSTIBA@cluster0.btmwmdh.mongodb.net/test").await.unwrap();
+    dotenv().ok();
+    let client = Client::with_uri_str(std::env::var("MONGODB_URL").unwrap()).await.unwrap();
     let db = client.database("Cluster0");
     let collection = db.collection::<Users>("users");
     let vcollection: Collection<VoiceNote>= db.collection::<VoiceNote>("Voice Notes");
