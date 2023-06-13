@@ -1,6 +1,3 @@
-
-
-
 use std::{fs::{self, File}, path::Path, vec};
 use chrono::{DateTime, Utc, TimeZone};
 pub use eframe::{run_native, egui, App};
@@ -19,20 +16,6 @@ use egui::TextStyle;
 use egui::RichText;
 use egui::widgets::Button;
 
-
-
-enum Page {
-    Signup,
-    Login,
-    Home,
-    MyTweet,
-    Follow,
-    FollowerProfile,
-    Conversation,
-    UserProfile,
-    Following,
-    Followers
-}
 pub struct Gui {
     current_page: Page,
     error_message: Option<String>,
@@ -49,6 +32,19 @@ pub struct Gui {
     following: Option<Vec<backend::publicUser>>,
     followers: Option<Vec<backend::publicUser>>,
     window_style: egui::Style,
+}
+
+enum Page {
+    Signup,
+    Login,
+    Home,
+    MyTweet,
+    Follow,
+    FollowerProfile,
+    Conversation,
+    UserProfile,
+    Following,
+    Followers
 }
 
 enum Theme {
@@ -180,11 +176,11 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                         // Show an error message if either the username or password is empty
                         self.error_message = Some("All fields are required".to_string()); // Store error message in a variable
                     } else {
-                        let rt = Runtime::new().unwrap();
+                        let runtime = Runtime::new().unwrap();
                         let username = self.username.clone();
                         let email = self.email.clone();
                         let pass = self.password.clone();
-                        let (response) = rt.block_on(async move {
+                        let (response) = runtime.block_on(async move {
                             let response = tokio::spawn(async move {
                                 let (user_collection, voice_note_collection, db, client) =
                                     backend::connect_to_mongodb().await;
@@ -250,26 +246,22 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         
         ui.add(egui::Label::new("Enter  your Voicer account details:"));
         ui.add_space(5.0);
-        // Group the contents of the login page
         ui.vertical_centered(|ui| {
-            // Group the contents of the signup page
             ui.group(|ui| {
                 ui.vertical_centered(|ui| {
-                    // Group the contents of the signup page
                     ui.vertical_centered(|ui|{
             
                         ui.add_space(10.0);
                     }
                     );
                 });
-                // Calculate available width for each column
                 let column_width = ui.available_width();
             
                 ui.horizontal(|ui| {
                     ui.add_space(200.0);
                     ui.label("Username: ");
                     let current_width = ui.available_width();
-                    ui.add_space(310.0 - (column_width - current_width)); // Add spacing between the heading and the buttons
+                    ui.add_space(310.0 - (column_width - current_width)); 
                     ui.text_edit_singleline(&mut self.username);
                 });
 
@@ -277,7 +269,7 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                     ui.add_space(200.0);
                     ui.label("Password :  ");
                     let current_width = ui.available_width();
-                    ui.add_space(310.0-(column_width-current_width)); // Add spacing between the heading and the buttons    
+                    ui.add_space(310.0-(column_width-current_width));   
                     ui.add(egui::TextEdit::singleline(&mut self.password).password(true));
                 });
                 ui.add_space(5.0);
@@ -285,10 +277,10 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                     ui.add_space(558.0);
                     if ui.button(RichText::new("Log in")).clicked() {
         
-                        let rt= Runtime::new().unwrap();
+                        let runtime= Runtime::new().unwrap();
                         let username= self.username.clone();
                         let pass= self.password.clone();
-                        let (response) = rt.block_on( async move
+                        let (response) = runtime.block_on( async move
                             {
                                 let response = tokio::spawn
                                 ( async move
@@ -346,13 +338,10 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
 
     
 
-
-
-// Function to show the home page UI
 fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
     ui.heading("Voicer Home Page");
     ui.add_space(10.0);
-    ui.label(format!("Welcome, {}!", self.username)); // Display welcome message with user's name
+    ui.label(format!("Welcome, {}!", self.username));
 
     // Count the number of voicenotes
     let voicenote_count = self.voicenote_vec.clone().unwrap().len();
@@ -363,7 +352,6 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.add_space(420.0);
         if ui.button("▶️ Play All").clicked() {
-            // Play all voicenote files
             let directory = ".";
             let files = fs::read_dir(directory).unwrap();
             let mut filenames: Vec<String> = Vec::new(); 
@@ -379,45 +367,35 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
                 }
             }
 
-
             for filename in filenames {
                 play_audio(&filename);
             }
         }
 
         if ui.button("📣 Tweet").clicked() {
-            // Tweet the voicenote
             self.current_page=Page::MyTweet;                        
         }
         if ui.button("➹ Follow").clicked() {
-            // Follow a user
             self.current_page=Page::Follow;                        
         }
         if ui.button("Theme").clicked() {
-            // Change mode to light mode
             self.toggle_theme(ctx);
         }
 
         if ui.button("Profile").clicked() {
             let user = self.user.clone().unwrap();
-            let rt = Runtime::new().unwrap();
-            let mut delete:Vec<ObjectId> = rt.block_on( async move
+            let runtime = Runtime::new().unwrap();
+            let mut delete:Vec<ObjectId> = runtime.block_on( async move
                 {
-                    let response = tokio::spawn
-                    ( async move
-                        {
-                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                            let mut delete:Vec<ObjectId> = Vec::new();
-                            for quote in user.voice_notes {
-                                let response = backend::download_voice_notes(voice_note_collection.clone(), quote).await;
-                                if response == false {
-                                    delete.push(quote);
-                                }
-                            }
-                            delete
+                    let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                    let mut delete:Vec<ObjectId> = Vec::new();
+                    for quote in user.voice_notes {
+                        let response = backend::download_voice_notes(voice_note_collection.clone(), quote).await;
+                        if response == false {
+                            delete.push(quote);
                         }
-                    ).await.unwrap();
-                    response
+                    }
+                    delete
                 }
             );
             for quote in &mut delete{
@@ -428,7 +406,6 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
 
 
         if ui.button("Logout").clicked() {
-            // Redirect to Login page and clear user data
             if let Err(err) = delete_wav_files() {
                 eprintln!("Error deleting .wav files: {}", err);
             } else {
@@ -456,7 +433,6 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         let userid = self.user.clone().unwrap()._id;
         if let Some(vec_vc) = vec_vc{
             let voice = vec_vc;
-            // Display voicenote posts
             for i in 0..voicenote_count {
                 let voice_obj = voice[i].clone();
                 ui.horizontal(|ui|{
@@ -483,50 +459,32 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
                                     ui.horizontal(|ui| {
                                         if ui.add(egui::Button::new(RichText::new(("Shut Up")).color(egui::Color32::WHITE)).fill(Color32::LIGHT_RED)).clicked() {
                                             reaction = backend::ReactionType::ShutUp;
-                                            let rt= Runtime::new().unwrap();
-                                            let (response) = rt.block_on( async move
+                                            let runtimet= Runtime::new().unwrap();
+                                            let (response) = runtimet.block_on( async move
                                                 {
-                                                    let response = tokio::spawn
-                                                    ( async move
-                                                        {
-                                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                                                            backend::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
-                                                        }
-                                                    ).await.unwrap();
-                                                    response
+                                                    let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                                    backend::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await
                                                 }
                                             );
                                         }
                                         if ui.add(egui::Button::new(RichText::new(("Speak Up")).color(egui::Color32::WHITE)).fill(Color32::LIGHT_GREEN)).clicked() {
                                             reaction = backend::ReactionType::SpeakUp;
-                                            let rt= Runtime::new().unwrap();
-                                            let (response) = rt.block_on( async move
+                                            let runtime= Runtime::new().unwrap();
+                                            let (response) = runtime.block_on( async move
                                                 {
-                                                    let response = tokio::spawn
-                                                    ( async move
-                                                        {
-                                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                                                            backend::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
-                                                        }
-                                                    ).await.unwrap();
-                                                    response
+                                                    let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                                    backend::react_to_quote(voice_note_collection, voice_obj._id,userid,reaction.clone()).await;
                                                 }
                                             );
                                         }
                                         if ui.add(egui::Button::new(RichText::new(("Reply")).color(egui::Color32::WHITE)).fill(Color32::LIGHT_BLUE)).clicked() {
-                                            let rt= Runtime::new().unwrap();
-                                            let (response) = rt.block_on( async move
+                                            let runtime= Runtime::new().unwrap();
+                                            let (response) = runtime.block_on( async move
                                                 {
-                                                    let response = tokio::spawn
-                                                    ( async move
-                                                        {
-                                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                                                            let replies = backend::create_conversation(voice_note_collection, voice_obj._id).await;
-                                    
-                                                            (replies)
-                                                        }
-                                                    ).await.unwrap();
-                                                    response
+                                                    let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                                    let replies = backend::create_conversation(voice_note_collection, voice_obj._id).await;
+                            
+                                                    (replies)
                                                 });
                                             self.conversation = Some(response);
                                             self.current_page= Page::Conversation;
@@ -574,25 +532,19 @@ fn conversation(&mut self, ctx: &egui::Context, ui: &mut egui::Ui){
             }
             Err(err) => println!("Error {}", err),
         }
-        let rt= Runtime::new().unwrap();
-        let response = rt.block_on( async move
+        let runtime= Runtime::new().unwrap();
+        let response = runtime.block_on( async move
             {
-                let response = tokio::spawn
-                ( async move
-                    {
-                        let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                        let data = backend::convert_audio_to_vec(&directory).await;
-                        backend::create_comment(voice_note_collection.clone(),user_collection, userid, reply.v_id.to_hex() , file_name, data).await;
-                        match fs::remove_dir_all(&(Path::new(&folder_name))) {
-                            Ok(_) => println!("Directory deleted successfully"),
-                            Err(err) => println!("Error deleting directory: {}", err),
-                        }
-                        let replies = backend::create_conversation(voice_note_collection, reply.v_id).await;
-                
-                        (replies)
-                    }
-                ).await.unwrap();
-                response
+                let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                let data = backend::convert_audio_to_vec(&directory).await;
+                backend::create_comment(voice_note_collection.clone(),user_collection, userid, reply.v_id.to_hex() , file_name, data).await;
+                match fs::remove_dir_all(&(Path::new(&folder_name))) {
+                    Ok(_) => println!("Directory deleted successfully"),
+                    Err(err) => println!("Error deleting directory: {}", err),
+                }
+                let replies = backend::create_conversation(voice_note_collection, reply.v_id).await;
+        
+                (replies)
             });
         self.conversation = Some(response);
         self.current_page= Page::Conversation;   
@@ -620,33 +572,21 @@ fn conversation(&mut self, ctx: &egui::Context, ui: &mut egui::Ui){
                     ui.horizontal(|ui| {
                         if ui.add(egui::Button::new("Shut Up").fill(Color32::LIGHT_RED)).clicked() {
                             reaction = backend::ReactionType::ShutUp;
-                            let rt= Runtime::new().unwrap();
-                            let (response) = rt.block_on( async move
+                            let runtime= Runtime::new().unwrap();
+                            let (response) = runtime.block_on( async move
                                 {
-                                    let response = tokio::spawn
-                                    ( async move
-                                        {
-                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                                            backend::react_to_quote(voice_note_collection, voice._id,userid,reaction.clone()).await;
-                                        }
-                                    ).await.unwrap();
-                                    response
+                                    let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                    backend::react_to_quote(voice_note_collection, voice._id,userid,reaction.clone()).await;
                                 }
                             );
                         }
                         if ui.add(egui::Button::new("Shut Up").fill(Color32::LIGHT_GREEN)).clicked() {
                             reaction = backend::ReactionType::SpeakUp;
-                            let rt= Runtime::new().unwrap();
-                            let (response) = rt.block_on( async move
+                            let runtime= Runtime::new().unwrap();
+                            let (response) = runtime.block_on( async move
                                 {
-                                    let response = tokio::spawn
-                                    ( async move
-                                        {
-                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                                            backend::react_to_quote(voice_note_collection, voice._id,userid,reaction.clone()).await;
-                                        }
-                                    ).await.unwrap();
-                                    response
+                                    let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                    backend::react_to_quote(voice_note_collection, voice._id,userid,reaction.clone()).await;
                                 }
                             );
                         }
@@ -685,39 +625,30 @@ fn tweet_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
             Err(err) => println!("Error {}", err),
         }
         let userid =self.user.clone().unwrap()._id;;
-        let rt= Runtime::new().unwrap();
-        let response = rt.block_on( async move
+        let runtime= Runtime::new().unwrap();
+        let response = runtime.block_on( async move
             {
-                let response = tokio::spawn
-                ( async move
-                    {
-                        let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                        let data = backend::convert_audio_to_vec(&directory).await;
-                        backend::create_post(voice_note_collection,user_collection, userid, data, file_name).await;
-                        match fs::remove_dir_all(&(Path::new(&folder_name))) {
-                            Ok(_) => println!("Directory deleted successfully"),
-                            Err(err) => println!("Error deleting directory: {}", err),
-                        }
-                        is_saved = true;
-                    }
-                ).await.unwrap();
-                response
+                let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                let data = backend::convert_audio_to_vec(&directory).await;
+                backend::create_post(voice_note_collection,user_collection, userid, data, file_name).await;
+                match fs::remove_dir_all(&(Path::new(&folder_name))) {
+                    Ok(_) => println!("Directory deleted successfully"),
+                    Err(err) => println!("Error deleting directory: {}", err),
+                }
+                is_saved = true;
             });        
     }
     if is_saved {
         ui.label("Voicenote saved successfully!");
     }
 
-    // Display success message if voicenote is saved
-
     if ui.button("Back").clicked() {
         self.current_page = Page::Home;
     }
 
-
     ui.add_space(10.0);
 
-    }
+}
     // Function to show the Shared Files page UI
 fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         let mut userlist: Vec<publicUser> = Vec::new();
@@ -737,18 +668,12 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
             {   
                 let user2=self.followuser.clone();
                 let userid2= self.user.clone().unwrap()._id;
-                let rt= Runtime::new().unwrap();
-                    let (userlistr) = rt.block_on( async move
+                let runtime= Runtime::new().unwrap();
+                    let (userlistr) = runtime.block_on( async move
                         {
-                            let response = tokio::spawn
-                            ( async move
-                                {
-                                    let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                                    let userlistr=find_users_by_names(user_collection, & user2, userid2).await;
-                                    userlistr
-                                }
-                            ).await.unwrap();
-                            response
+                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                            let userlistr=find_users_by_names(user_collection, & user2, userid2).await;
+                            userlistr
                         });
                 self.userslist=Some(userlistr);
                 self.current_page=Page::FollowerProfile;
@@ -772,17 +697,12 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         if ui.button("Follow").clicked() {
             let mut myuser=self.user.clone().unwrap()._id;
             let mut myfol=self.userslist.clone().unwrap()._id;
-            let rt= Runtime::new().unwrap();
-                let (userlistr) = rt.block_on( async move
+            let runtime= Runtime::new().unwrap();
+                let (userlistr) = runtime.block_on( async move
                     {
-                        let response = tokio::spawn
-                        ( async move
-                            {
-                                let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                                backend::follow(user_collection.clone(), myuser, myfol).await;
-                            }
-                        ).await.unwrap();
-                        response
+                        let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                        backend::follow(user_collection.clone(), myuser, myfol).await;
+
                     });
             ui.label(format!("Successfull"));
             self.current_page=Page::Home;
@@ -807,17 +727,11 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
             let current_width = ui.available_width();
             ui.text_edit_singleline(&mut your_info.description);
             if ui.button("Update Bio").clicked() {
-                let rt= Runtime::new().unwrap();
-                let (userlistr) = rt.block_on( async move
+                let runtime= Runtime::new().unwrap();
+                let (userlistr) = runtime.block_on( async move
                     {
-                        let response = tokio::spawn
-                        ( async move
-                            {
-                                let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                                backend::update_description_by_username(user_collection, &your_info.username, &your_info.description).await;
-                            }
-                        ).await.unwrap();
-                        response
+                        let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                        backend::update_description_by_username(user_collection, &your_info.username, &your_info.description).await;
                     });
                     ui.label(format!("Successfull"));
                     self.current_page=Page::Home;
@@ -827,34 +741,22 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         let following_count = your_info.following.len();
         
         if ui.add(egui::Button::new(format!("Followers: {}", followers_count))).clicked() {
-            let rt= Runtime::new().unwrap();
-            let (userlistr) = rt.block_on( async move
+            let runtime= Runtime::new().unwrap();
+            let (userlistr) = runtime.block_on( async move
                 {
-                    let response = tokio::spawn
-                    ( async move
-                        {
-                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                            backend::get_all_followers_profile(user_collection, your_info._id).await
-                        }
-                    ).await.unwrap();
-                    response
+                    let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                    backend::get_all_followers_profile(user_collection, your_info._id).await
                 });
             self.followers = Some(userlistr);
             self.current_page=Page::Followers;
         };
 
         if ui.add(egui::Button::new(format!("Following: {}", following_count))).clicked() {
-            let rt= Runtime::new().unwrap();
-            let (userlistr) = rt.block_on( async move
+            let runtime= Runtime::new().unwrap();
+            let (userlistr) = runtime.block_on( async move
                 {
-                    let response = tokio::spawn
-                    ( async move
-                        {
-                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                            backend::get_all_following_profile(user_collection, your_info._id).await
-                        }
-                    ).await.unwrap();
-                    response
+                    let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                    backend::get_all_following_profile(user_collection, your_info._id).await
                 });
             self.following = Some(userlistr);
             self.current_page=Page::Following;
@@ -875,17 +777,11 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                         }
                         let post = your_info.voice_notes[i].clone();
                         if ui.add(egui::Button::new(RichText::new(("Delete")).color(egui::Color32::WHITE)).fill(Color32::RED)).clicked() {
-                            let rt= Runtime::new().unwrap();
-                            let (userlistr) = rt.block_on( async move
-                                {
-                                    let response = tokio::spawn
-                                    ( async move
-                                        {
-                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                                            backend::delete_post(voice_note_collection, user_collection, post, your_info._id).await
-                                        }
-                                    ).await.unwrap();
-                                    response
+                            let runtime= Runtime::new().unwrap();
+                            let (userlistr) = runtime.block_on( async move
+                            {
+                                let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                                backend::delete_post(voice_note_collection, user_collection, post, your_info._id).await
                             });
                         }
                     });
@@ -917,18 +813,12 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                     if ui.add(egui::Button::new(RichText::new(("Unfollow")).color(egui::Color32::RED))).clicked() {
                         let mut myuser=self.user.clone().unwrap()._id;
                         let mut following=user._id.clone();
-                        let rt= Runtime::new().unwrap();
-                            let (userlistr) = rt.block_on( async move
-                                {
-                                    let response = tokio::spawn
-                                    ( async move
-                                        {
-                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                                            backend::unfollow(user_collection.clone(), myuser, following).await
-                                        }
-                                    ).await.unwrap();
-                                    response
-                                });
+                        let runtime= Runtime::new().unwrap();
+                        let (userlistr) = runtime.block_on( async move
+                        {
+                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                            backend::unfollow(user_collection.clone(), myuser, following).await
+                        });
                         self.following = Some(userlistr);
                         ui.label(format!("Successfull"));
                     }
@@ -958,18 +848,12 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                     if ui.add(egui::Button::new(RichText::new(("Remove")).color(egui::Color32::WHITE)).fill(Color32::RED)).clicked() {
                         let mut myuser=self.user.clone().unwrap()._id;
                         let mut follower=user._id.clone();
-                        let rt= Runtime::new().unwrap();
-                            let (userlistr) = rt.block_on( async move
-                                {
-                                    let response = tokio::spawn
-                                    ( async move
-                                        {
-                                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                                            backend::remove_follower(user_collection.clone(), myuser, follower).await
-                                        }
-                                    ).await.unwrap();
-                                    response
-                                });
+                        let runtime= Runtime::new().unwrap();
+                        let (userlistr) = runtime.block_on( async move
+                        {
+                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                            backend::remove_follower(user_collection.clone(), myuser, follower).await
+                        });
                         self.following = Some(userlistr);
                         ui.label(format!("Successfull"));
                     }
