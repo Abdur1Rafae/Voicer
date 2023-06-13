@@ -229,9 +229,9 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         ui.vertical_centered(|ui|{
             ui.add_space(10.0);
             ui.heading("Login");
-            ui.label(RichText::new(("Test")).color(egui::Color32::DARK_RED));
-            ui.add_space(10.0);
-            ui.add(egui::Button::new("Test").fill(Color32::RED)).clicked();
+            // ui.label(RichText::new(("Test")).color(egui::Color32::DARK_RED));
+            // ui.add_space(10.0);
+            // ui.add(egui::Button::new("Test").fill(Color32::RED)).clicked();
         });
         ui.vertical_centered(|ui| {
             // Group the contents of the signup page
@@ -372,7 +372,7 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
             }
         }
 
-        if ui.button("📣 Tweet").clicked() {
+        if ui.button("📣 Quote").clicked() {
             self.current_page=Page::MyTweet;                        
         }
         if ui.button("➹ Follow").clicked() {
@@ -385,10 +385,31 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         if ui.button("Profile").clicked() {
             let user = self.user.clone().unwrap();
             let runtime = Runtime::new().unwrap();
+            let username= self.username.clone();
+            let pass= self.password.clone();
+            let (response) = runtime.block_on( async move
+                {
+                    let response = tokio::spawn
+                    ( async move
+                        {
+                            let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                            let response = backend::get_user_by_username(user_collection.clone(), username, pass).await;
+                            let user_iddd= response.clone().unwrap()._id;
+                            let response2 = backend::get_all_voice_ids_from_following(user_collection ,voice_note_collection , user_iddd).await;
+    
+                            (response,response2)
+                        }
+                    ).await.unwrap();
+                    response
+                });
+
+            self.user = response.0.clone();
+            self.voicenote_vec = Some(response.1.clone());
             let mut delete:Vec<ObjectId> = runtime.block_on( async move
                 {
                     let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
                     let mut delete:Vec<ObjectId> = Vec::new();
+
                     for quote in user.voice_notes {
                         let response = backend::download_voice_notes(voice_note_collection.clone(), quote).await;
                         if response == false {
@@ -677,6 +698,9 @@ fn FollowPage(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                         });
                 self.userslist=Some(userlistr);
                 self.current_page=Page::FollowerProfile;
+            }
+            if ui.button("Home").clicked() {
+                self.current_page = Page::Home;
             }
         });
         ui.add_space(10.0);

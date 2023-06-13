@@ -709,7 +709,6 @@ pub async fn download_voice_notes(voice_collection : Collection<VoiceNote> , v_i
             None => {
                 println!("No voice data found");
                 Vec::new()
-        
             }
         };
     
