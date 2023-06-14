@@ -1,5 +1,7 @@
 #![allow(warnings)]
 
+use eframe::Theme;
+use egui::Vec2;
 use frontend::Gui;
 
 use tokio::{io, time::Instant};
@@ -10,7 +12,9 @@ pub mod backend;
 
 fn main() {
     let app = Gui::new();
-    let win_options = eframe::NativeOptions::default();
-    // win_options.initial_window_size = Some(egui::Vec2::new(1000.0, 800.0));
+    let mut win_options = eframe::NativeOptions::default();
+    win_options.initial_window_size = Some(egui::Vec2::new(1200.0, 800.0));
+    win_options.centered = true;
+    win_options.resizable = false;
     run_native("Voicer",  win_options, Box::new(|cc| Box::new(app)));
 }

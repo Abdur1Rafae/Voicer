@@ -1,7 +1,7 @@
 use std::{fs::{self, File}, path::Path, vec};
 use chrono::{DateTime, Utc, TimeZone};
 pub use eframe::{run_native, egui, App};
-use egui::{Ui, Color32};
+use egui::{Ui, Color32, Vec2};
 use crate::backend::{self, Users, publicUser, get_user_by_username, find_users_by_names};
 use mongodb::{Client, Collection  , Database};
 use mongodb::bson::{self,oid::ObjectId};
@@ -15,6 +15,11 @@ use record_audio::audio_clip::AudioClip as ac;
 use egui::TextStyle;
 use egui::RichText;
 use egui::widgets::Button;
+use glium::glutin::event::{Event, WindowEvent};
+use glium::glutin::event_loop::{ControlFlow, EventLoop};
+use glium::glutin::window::WindowBuilder;
+use glium::Surface;
+use eframe::NativeOptions;
 
 pub struct Gui {
     current_page: Page,
@@ -47,7 +52,7 @@ enum Page {
     Followers
 }
 
-enum Theme {
+pub enum Theme {
     Dark,
     Light,
 }
@@ -68,8 +73,8 @@ impl Gui {
             
             }
             Theme::Light => {
-                self.theme = Theme::Dark;
-                ctx.set_visuals(egui::Visuals::dark());
+                self.theme = Theme::Light;
+                ctx.set_visuals(egui::Visuals::light());
 
             }
         }
@@ -118,55 +123,57 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
 
     ui.vertical_centered(|ui| {
 
-            ui.group(|ui| {
-                ui.vertical_centered(|ui| {
-
-                    ui.vertical_centered(|ui|{
+        ui.vertical_centered(|ui|{
             
-                        ui.add_space(10.0);
-                    }
-                    );});
+            ui.add_space(20.0);
+            ui.label(RichText::new(("Enter  your new Voicer account details:")));
+            ui.add_space(5.0);
+
+        });
+            ui.group(|ui| {
+                
+                
 
                 let column_width = ui.available_width();
                 ui.horizontal(|ui| {
-                    ui.add_space(200.0);
+                    ui.add_space(400.0);
                     ui.label("Username: ");
                     let current_width = ui.available_width();
-                    ui.add_space(310.0 - (column_width - current_width)); 
+                    ui.add_space(610.0 - (column_width - current_width)); 
                     ui.text_edit_singleline(&mut self.username);
                 });
                 ui.horizontal(|ui| {
-                    ui.add_space(200.0);
+                    ui.add_space(400.0);
                     ui.label("Email: ");
                     let current_width = ui.available_width();
-                    ui.add_space(310.0 - (column_width - current_width)); 
+                    ui.add_space(610.0 - (column_width - current_width)); 
                     ui.text_edit_singleline(&mut self.email);
                 });
                 ui.horizontal(|ui| {
-                    ui.add_space(200.0);
+                    ui.add_space(400.0);
                     ui.label("Password:  ");
                     let current_width = ui.available_width();
-                    ui.add_space(310.0 - (column_width - current_width));
+                    ui.add_space(610.0 - (column_width - current_width));
                     ui.add(egui::TextEdit::singleline(&mut self.password).password(password_visible));
                     //ui.text_edit_singleline(&mut self.password);
                 });
                 ui.horizontal(|ui| {
-                    ui.add_space(200.0);
+                    ui.add_space(400.0);
                     ui.label("Confirm Password:  ");
                     let current_width = ui.available_width();
-                    ui.add_space(310.0 - (column_width - current_width));
+                    ui.add_space(610.0 - (column_width - current_width));
                     ui.add(egui::TextEdit::singleline(&mut self.confirm_pass).password(password_visible));
                     //ui.text_edit_singleline(&mut confirm_pass);
                 });
                 ui.add_space(5.0);
                 ui.horizontal(|ui| {
-                    ui.add_space(310.0);
+                    ui.add_space(610.0);
                     ui.add(egui::Checkbox::new(&mut password_visible, "Show Password"));
                 });
     
                 ui.add_space(5.0);
                 ui.horizontal(|ui| {
-                ui.add_space(550.0);
+                ui.add_space(850.0);
                 if ui.button("Sign up").clicked() {
                     // Handle signup button click
                     if self.password != self.confirm_pass {
@@ -201,7 +208,7 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                 }});
                 ui.add_space(20.0);
                 ui.horizontal(|ui| {
-                    ui.add_space(750.0);
+                    ui.add_space(1170.0);
                 });
             });
                 ui.add_space(5.0);
@@ -228,7 +235,7 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
     fn login_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         ui.vertical_centered(|ui|{
             ui.add_space(10.0);
-            ui.label(RichText::new(("LOGIN")));
+            ui.heading(RichText::new(("Login")));
             //ui.label(RichText::new(("Test")).color(egui::Color32::DARK_RED));
             ui.add_space(10.0);
             //ui.add(egui::Button::new("Test").fill(Color32::RED)).clicked();
@@ -243,10 +250,14 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                 });
             }
             );});
-        ui.label(RichText::new(("Enter  your Voicer account details:")));
-        ui.add_space(5.0);
+
         ui.vertical_centered(|ui| {
+            ui.label(RichText::new(("Enter  your Voicer account details:")));
+            ui.add_space(5.0);
+    
+            ui. horizontal(|ui|{ui.add_space(200.0)});
             ui.group(|ui| {
+                ui. horizontal(|ui|{ui.add_space(500.0)});
                 ui.vertical_centered(|ui| {
                     ui.vertical_centered(|ui|{
             
@@ -257,24 +268,24 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                 let column_width = ui.available_width();
             
                 ui.horizontal(|ui| {
-                    ui.add_space(200.0);
+                    ui.add_space(400.0);
                     ui.label(RichText::new(("Username:")));
                     let current_width = ui.available_width();
-                    ui.add_space(310.0 - (column_width - current_width)); 
+                    ui.add_space(510.0 - (column_width - current_width)); 
                     ui.text_edit_singleline(&mut self.username);
                 });
 
                 ui.horizontal(|ui| {
-                    ui.add_space(200.0);
+                    ui.add_space(400.0);
                     ui.label(RichText::new(("Password:")));
                     let current_width = ui.available_width();
-                    ui.add_space(310.0-(column_width-current_width));   
+                    ui.add_space(510.0-(column_width-current_width));   
                     ui.add(egui::TextEdit::singleline(&mut self.password).password(true));
                 });
                 ui.add_space(5.0);
                 ui.horizontal(|ui| {
-                    ui.add_space(558.0);
-                    if ui.add(egui::Button::new("Login").fill(Color32::LIGHT_GRAY)).clicked(){
+                    ui.add_space(755.0);
+                    if ui.add(egui::Button::new("Login").fill(Color32::DARK_GRAY)).clicked(){
         
                         let runtime= Runtime::new().unwrap();
                         let username= self.username.clone();
@@ -302,6 +313,8 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
                         self.current_page = Page::Home;
                     }
                 });
+                ui.horizontal(|ui|{ ui.add_space(1170.0);
+                });
             });
             
         });
@@ -319,7 +332,7 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
 
         ui.horizontal(|ui| {
             ui.label(RichText::new(("Don't have an account?")));
-            if ui.add(egui::Button::new("Sign up").fill(Color32::LIGHT_BLUE)).clicked(){
+            if ui.add(egui::Button::new("Sign up").fill(Color32::DARK_GRAY)).clicked(){
                 self.error_message = None;
                 self.username.clear();
                 self.password.clear();
@@ -338,9 +351,17 @@ fn signup_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
     
 
 fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
-    ui.heading("Voicer Home Page");
+    ui.vertical_centered(|ui|{
+        ui.add_space(10.0);
+        ui.heading(RichText::new(("Voicer Home Page")));
+        //ui.label(RichText::new(("Test")).color(egui::Color32::DARK_RED));
+        ui.add_space(10.0);
+        //ui.add(egui::Button::new("Test").fill(Color32::RED)).clicked();
+        
+    });
+    //ui.heading("Voicer Home Page");
     ui.add_space(10.0);
-    ui.label(format!("Welcome, {}!", self.username));
+    ui.heading(format!("Welcome, {}!", self.username));
 
     // Count the number of voicenotes
     let voicenote_count = self.voicenote_vec.clone().unwrap().len();
@@ -349,7 +370,7 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
     ui.add_space(10.0);
 
     ui.horizontal(|ui| {
-        ui.add_space(420.0);
+        ui.add_space(300.0);
         if ui.button("▶️ Play All").clicked() {
             let directory = ".";
             let files = fs::read_dir(directory).unwrap();
@@ -371,16 +392,25 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
             }
         }
 
+        ui.horizontal(|ui|{ui.add_space(20.0);
+        });
         if ui.button("📣 Quote").clicked() {
             self.current_page=Page::MyTweet;                        
         }
+        ui.horizontal(|ui|{ui.add_space(20.0);
+        });
+
         if ui.button("➹ Follow").clicked() {
             self.current_page=Page::Follow;                        
         }
+        ui.horizontal(|ui|{ui.add_space(20.0);
+        });
+
         if ui.button("Theme").clicked() {
             self.toggle_theme(ctx);
         }
-
+        ui.horizontal(|ui|{ui.add_space(20.0);
+        });
         if ui.button("Profile").clicked() {
             let user = self.user.clone().unwrap();
             let runtime = Runtime::new().unwrap();
@@ -424,7 +454,8 @@ fn home_page(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
             self.current_page = Page::UserProfile;
         }
 
-
+        ui.horizontal(|ui|{ui.add_space(20.0);
+        });
         if ui.button("Logout").clicked() {
             if let Err(err) = delete_wav_files() {
                 eprintln!("Error deleting .wav files: {}", err);
@@ -623,48 +654,56 @@ fn tweet_page(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
     let column_width = ui.available_width();
     let folder_name = format!("{}", self.user.clone().unwrap()._id);
     fs::create_dir_all(&folder_name).unwrap();
-    let mut file_name = ObjectId::new();
+    let mut file_name: ObjectId = ObjectId::new();
     let directory = format!("{}/{}.wav", folder_name, file_name.to_hex());
     let mut is_saved = false; // Flag to indicate if voicenote is successfully saved
 
+    ui.add_space(40.0);
     ui.horizontal(|ui| {
-        ui.heading("Your voicenote can now be recorded...");
     });
     
-    // Record button
-    if ui.button("Record").clicked() {
-        match ac::record(None) {
-            Ok(clip) => {
-                match clip.export(format!("{}" , directory).as_str()) {
-                    Ok(_) => {
-                        println!("Successfully saved!");
+    ui.horizontal(|ui|{
+        ui.heading(RichText::new("Your voicenote can now be recorded..."));
+        ui.add_space(200.0);
+        if ui.button("Record").clicked() {
+            match ac::record(None) {
+                Ok(clip) => {
+                    match clip.export(format!("{}" , directory).as_str()) {
+                        Ok(_) => {
+                            println!("Successfully saved!");
+                        }
+                        Err(err) => println!("Error {}", err),
                     }
-                    Err(err) => println!("Error {}", err),
                 }
+                Err(err) => println!("Error {}", err),
             }
-            Err(err) => println!("Error {}", err),
+            let userid =self.user.clone().unwrap()._id;;
+            let runtime= Runtime::new().unwrap();
+            let response = runtime.block_on( async move
+                {
+                    let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
+                    let data = backend::convert_audio_to_vec(&directory).await;
+                    backend::create_post(voice_note_collection,user_collection, userid, data, file_name).await;
+                    match fs::remove_dir_all(&(Path::new(&folder_name))) {
+                        Ok(_) => println!("Directory deleted successfully"),
+                        Err(err) => println!("Error deleting directory: {}", err),
+                    }
+                    is_saved = true;
+                });        
         }
-        let userid =self.user.clone().unwrap()._id;;
-        let runtime= Runtime::new().unwrap();
-        let response = runtime.block_on( async move
-            {
-                let (user_collection, voice_note_collection, db, client) = backend::connect_to_mongodb().await;
-                let data = backend::convert_audio_to_vec(&directory).await;
-                backend::create_post(voice_note_collection,user_collection, userid, data, file_name).await;
-                match fs::remove_dir_all(&(Path::new(&folder_name))) {
-                    Ok(_) => println!("Directory deleted successfully"),
-                    Err(err) => println!("Error deleting directory: {}", err),
-                }
-                is_saved = true;
-            });        
-    }
+        ui.add_space(100.0);
+        if ui.button("Back").clicked() {
+            self.current_page = Page::Home;
+        }
+    
+    });
+    // Record button
+    
     if is_saved {
         ui.label("Voicenote saved successfully!");
     }
 
-    if ui.button("Back").clicked() {
-        self.current_page = Page::Home;
-    }
+    
 
     ui.add_space(10.0);
 
@@ -895,7 +934,8 @@ impl App for Gui {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             self.window_style.visuals.override_text_color = Some(egui::Color32::from_rgb(200, 200, 200));            
-            
+            ctx.set_cursor_icon(egui::CursorIcon::Alias);
+
             match self.current_page {
                 Page::Signup => {
                     self.signup_page(ctx, ui);
