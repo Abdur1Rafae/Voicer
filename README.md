@@ -1,8 +1,4 @@
 # Built as university project for CSE 4xx Rust Programming.
-Project members: 
-Muhammad Abdur Rafae (22828)
-Saifullah Khan (22877)
-Hassan Yahya (22965)
 
 Project Idea: A twitter-like social media application built purely on rust libraries, with the change of tweets/quotes being recorded instead of being typed. 
 
